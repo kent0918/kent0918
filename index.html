@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>智慧工作台 (手機/電腦同步版)</title>
+    <title>智慧工作台 (跨日行事曆優化版)</title>
     <style>
         body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; display: flex; flex-direction: column; padding: 20px; background: #f0f2f5; margin: 0; height: 100vh; box-sizing: border-box; gap: 15px;}
         
@@ -48,8 +48,10 @@
         .day-header { text-align: center; font-size: 13px; font-weight: bold; padding-bottom: 4px; border-bottom: 1px solid #eee; margin-bottom: 6px; color: #666;}
         .day-header.today { background: #0066cc; color: white; border-radius: 4px; border: none; padding: 2px 0;}
         
+        /* 連續/一般行程樣式修正 */
         .cal-task { background: #e3f2fd; border-left: 3px solid #0066cc; padding: 4px; font-size: 11px; border-radius: 3px; margin-bottom: 4px; position: relative; word-break: break-all;}
-        .cal-task .del-task { float: right; color: #999; cursor: pointer; border: none; background: none; font-size: 10px; padding: 0;}
+        .cal-task.multi-day { background: #e6fffa; border-left: 3px solid #319795; color: #234e52; } /* 跨日行程改為質感綠 */
+        .cal-task .del-task { float: right; color: #999; cursor: pointer; border: none; background: none; font-size: 10px; padding: 0; margin-left: 4px;}
         .cal-time { font-weight: bold; color: #d32f2f; display: block; }
         .add-task-btn { margin-top: auto; background: #f8f9fa; border: 1px dashed #ccc; cursor: pointer; padding: 4px; border-radius: 4px; color: #666; font-size: 11px; text-align: center;}
         .add-task-btn:hover { background: #e9ecef; }
@@ -64,7 +66,7 @@
         /* 便利貼樣式 */
         .input-group { display: flex; flex-direction: column; gap: 10px; margin-bottom: 15px; background: #fff; padding: 15px; border-radius: 8px; border: 1px solid #ddd; flex-shrink: 0;}
         textarea, input[type="text"], select { width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 5px; resize: vertical; font-size: 14px; box-sizing: border-box; font-family: inherit;}
-        input[type="datetime-local"], input[type="time"] { padding: 8px; border: 1px solid #ccc; border-radius: 5px; font-family: inherit;}
+        input[type="datetime-local"], input[type="time"], input[type="date"] { padding: 8px; border: 1px solid #ccc; border-radius: 5px; font-family: inherit; font-size: 14px; box-sizing: border-box;}
         button.primary-btn { background: #0066cc; color: white; border: none; padding: 10px; border-radius: 5px; cursor: pointer; font-size: 16px; font-weight: bold;}
         button.primary-btn:hover { background: #0052a3; }
         
@@ -90,9 +92,11 @@
 
         /* 彈出彈窗 */
         .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000; justify-content: center; align-items: center;}
-        .modal { background: white; padding: 25px; border-radius: 10px; width: 90%; max-width: 360px; display: flex; flex-direction: column; gap: 12px;}
+        .modal { background: white; padding: 25px; border-radius: 10px; width: 90%; max-width: 400px; display: flex; flex-direction: column; gap: 12px; box-sizing: border-box;}
         .modal-actions { display: flex; justify-content: flex-end; gap: 10px;}
         .modal-actions button { padding: 8px 15px; cursor: pointer; border-radius: 5px; border: none;}
+        .modal-actions .btn-cancel { background: #e2e8f0; }
+        .modal-actions .btn-save { background: #0066cc; color: white; }
 
         /* 右上角常駐通知中心 */
         .notification-container { position: fixed; top: 20px; right: 20px; z-index: 3000; display: flex; flex-direction: column; gap: 10px; width: 300px; max-height: 90vh; overflow-y: auto; pointer-events: none; }
@@ -109,18 +113,17 @@
             .sync-controls button { flex: 1; justify-content: center; }
             .app-container { flex-direction: column; height: auto; overflow: visible; gap: 15px; }
             .panel { width: 100% !important; height: auto !important; overflow: visible; padding: 15px; }
-            .calendar-grid { grid-template-columns: repeat(2, 1fr); } /* 手機改為雙列，點擊最舒服 */
-            .day-cell { min-height: 130px; }
+            .calendar-grid { grid-template-columns: repeat(2, 1fr); } 
+            .day-cell { min-height: 140px; }
             .notification-container { width: calc(100% - 40px); left: 20px; right: 20px; top: 10px; }
         }
     </style>
 </head>
 <body>
 
-    <!-- 頂部智慧搜尋與同步面板 -->
     <div class="top-bar">
         <div class="search-wrapper">
-            <input type="text" id="globalSearchInput" class="search-input" placeholder="🔍 輸入關鍵字，一鍵搜穿行事曆、便利貼(含已放假/處理)、會議筆記本..." oninput="performGlobalSearch()">
+            <input type="text" id="globalSearchInput" class="search-input" placeholder="🔍 輸入關鍵字，一鍵搜穿行事曆、便利貼、會議筆記本..." oninput="performGlobalSearch()">
             <div id="searchResultsPanel" class="search-results-box"></div>
         </div>
         
@@ -132,7 +135,6 @@
     </div>
 
     <div class="app-container">
-        <!-- 左側：雙週行事曆 -->
         <div class="panel calendar-panel">
             <h2>
                 <span>📅 雙週行事曆</span>
@@ -148,14 +150,12 @@
             <div class="calendar-grid" id="week2Grid"></div>
         </div>
 
-        <!-- 右側：智慧看板 -->
         <div class="panel right-panel">
             <div class="tabs">
                 <button class="tab-btn active" id="btnTabSticky" onclick="switchTab('sticky')">📝 智慧便利貼</button>
                 <button class="tab-btn" id="btnTabNotebook" onclick="switchTab('notebook')">📓 會議筆記本</button>
             </div>
 
-            <!-- 頁籤 1：智慧便利貼 -->
             <div id="tabSticky" class="tab-content active">
                 <div class="input-group">
                     <textarea id="noteInput" placeholder="輸入隨手待辦..." style="height: 50px;"></textarea>
@@ -173,7 +173,6 @@
                 <div id="notesContainer"></div>
             </div>
 
-            <!-- 頁籤 2：會議筆記本 -->
             <div id="tabNotebook" class="tab-content">
                 <div id="notebookListView" style="display: flex; flex-direction: column; flex-grow: 1;">
                     <button class="primary-btn" style="margin-bottom: 15px;" onclick="openNoteEditor(-1)">+ 新增筆記</button>
@@ -200,13 +199,28 @@
         </div>
     </div>
 
-    <!-- 新增行程對話框 -->
     <div class="modal-overlay" id="taskModal">
         <div class="modal">
             <h3 style="margin:0;" id="modalDateTitle">新增行程</h3>
-            <input type="hidden" id="modalDateStr">
-            <input type="text" id="taskTitle" placeholder="行程內容">
-            <input type="time" id="taskTime">
+            <div style="display: flex; gap: 10px; flex-direction: column;">
+                <label style="font-size: 13px; font-weight: bold; color: #555;">📅 日期範圍設定：</label>
+                <div style="display: flex; gap: 5px; align-items: center;">
+                    <input type="date" id="taskStartDate" style="flex: 1;">
+                    <span>至</span>
+                    <input type="date" id="taskEndDate" style="flex: 1;">
+                </div>
+            </div>
+            
+            <div style="margin-top: 5px;">
+                <label style="font-size: 13px; font-weight: bold; color: #555;">✏️ 行程內容：</label>
+                <input type="text" id="taskTitle" placeholder="例如：日本東京出差、特別特休">
+            </div>
+
+            <div>
+                <label style="font-size: 13px; font-weight: bold; color: #555;">⏰ 開始時間 (可不填)：</label>
+                <input type="time" id="taskTime">
+            </div>
+
             <fieldset style="border: 1px solid #cbd5e0; border-radius: 6px; padding: 10px;">
                 <legend style="font-size: 12px; color: #0066cc; font-weight: bold;">🔔 提前預警</legend>
                 <select id="taskReminderOffset">
@@ -219,12 +233,11 @@
             </fieldset>
             <div class="modal-actions">
                 <button class="btn-cancel" onclick="closeModal()">取消</button>
-                <button class="btn-save" onclick="saveTask()">儲存</button>
+                <button class="btn-save" onclick="saveTask()">儲存行程</button>
             </div>
         </div>
     </div>
 
-    <!-- 右上角常駐通知容器 -->
     <div class="notification-container" id="notificationContainer"></div>
 
     <script>
@@ -232,19 +245,19 @@
         let notes = JSON.parse(localStorage.getItem('myStickyNotes')) || [];
         let meetingNotes = JSON.parse(localStorage.getItem('myMeetingNotes')) || [];
         
-        // 自動防錯修補 ID
-        calendarTasks.forEach(t => { if(!t.id) t.id = 'task-' + Math.random() + Date.now(); if(t.isNotified && t.isDismissed === undefined) t.isDismissed = true; });
-        notes.forEach(n => { if(!n.id) n.id = 'note-' + Math.random() + Date.now(); if(n.isNotified && n.isDismissed === undefined) n.isDismissed = true; });
+        // 舊資料結構相容性修補
+        calendarTasks.forEach(t => { 
+            if(!t.id) t.id = 'task-' + Math.random() + Date.now(); 
+            if(!t.startDate) t.startDate = t.date; // 舊的單日行程相容
+            if(!t.endDate) t.endDate = t.date;
+        });
 
         const weekDays = ['日', '一', '二', '三', '四', '五', '六'];
-        let currentViewDate = new Date(); let currentEditingNoteIndex = -1;
+        let currentViewDate = new Date(); 
         let mediaRecorder; let audioChunks = []; let tempAudioBase64 = null;
-        
-        // 2026年常見國定假日
         const nationalHolidays = ['2026-01-01', '2026-02-28', '2026-04-03', '2026-04-04', '2026-05-01', '2026-10-10'];
         let activeToasts = {};
 
-        // 雲端備份匯出
         function exportAllData() {
             let dataBundle = { calendarTasks: calendarTasks, notes: notes, meetingNotes: meetingNotes };
             let blob = new Blob([JSON.stringify(dataBundle)], { type: "application/json" });
@@ -255,7 +268,6 @@
             a.click();
         }
 
-        // 雲端備份匯入
         function importAllData(event) {
             let file = event.target.files[0]; if (!file) return;
             let reader = new FileReader();
@@ -275,7 +287,6 @@
             reader.readAsText(file);
         }
 
-        // 右上角常駐通知機制
         function showNotificationToast(id, type, title, message) {
             if (activeToasts[id]) return; activeToasts[id] = true;
             const container = document.getElementById('notificationContainer');
@@ -295,7 +306,6 @@
             }
         }
 
-        // 全域智慧關鍵字搜尋
         function performGlobalSearch() {
             const query = document.getElementById('globalSearchInput').value.trim().toLowerCase();
             const panel = document.getElementById('searchResultsPanel');
@@ -304,7 +314,9 @@
             
             calendarTasks.forEach(task => {
                 if (task.title.toLowerCase().includes(query)) {
-                    totalMatches++; panel.innerHTML += `<div class="search-item"><span class="search-badge badge-cal">📅 行事曆</span><strong>${task.date}</strong> ➜ ${task.title}</div>`;
+                    totalMatches++; 
+                    let dateDisplay = task.startDate === task.endDate ? task.startDate : `${task.startDate} ~ ${task.endDate}`;
+                    panel.innerHTML += `<div class="search-item"><span class="search-badge badge-cal">📅 行事曆</span><strong>${dateDisplay}</strong> ➜ ${task.title}</div>`;
                 }
             });
             notes.forEach(note => {
@@ -323,7 +335,6 @@
         function jumpToMeetingNoteFromSearch(index) { switchTab('notebook'); openNoteEditor(index); document.getElementById('globalSearchInput').value = ''; document.getElementById('searchResultsPanel').style.display = 'none'; }
         document.addEventListener('click', function(e) { const wrapper = document.querySelector('.search-wrapper'); if (wrapper && !wrapper.contains(e.target)) { document.getElementById('searchResultsPanel').style.display = 'none'; } });
 
-        // 頁籤切換
         function switchTab(tabName) {
             document.getElementById('btnTabSticky').classList.remove('active'); document.getElementById('btnTabNotebook').classList.remove('active');
             document.getElementById('tabSticky').classList.remove('active'); document.getElementById('tabNotebook').classList.remove('active');
@@ -331,7 +342,7 @@
             else { document.getElementById('btnTabNotebook').classList.add('active'); document.getElementById('tabNotebook').classList.add('active'); renderMeetingNotes(); }
         }
 
-        // 行事曆渲染
+        // 行事曆重構：支援跨日行程精準著色
         function renderCalendar() {
             const week1Container = document.getElementById('week1Grid'); const week2Container = document.getElementById('week2Grid');
             week1Container.innerHTML = ''; week2Container.innerHTML = '';
@@ -341,6 +352,7 @@
             document.getElementById('week1Title').innerText = `▼ ${startOfViewWeek.getMonth() + 1}月 第一週`;
             let realToday = new Date().toDateString();
 
+            // 1. 先把 14 天的網格做出來
             for (let i = 0; i < 14; i++) {
                 let d = new Date(startOfViewWeek); d.setDate(d.getDate() + i);
                 if (i === 7) document.getElementById('week2Title').innerText = `▼ ${d.getMonth() + 1}月 第二週`;
@@ -354,49 +366,94 @@
                 let isHoliday = nationalHolidays.includes(dateStr);
 
                 let cell = document.createElement('div'); cell.className = 'day-cell';
-                if (isWeekend || isHoliday) { cell.style.backgroundColor = '#fff0f2'; } // 假日淺粉紅底色
+                if (isWeekend || isHoliday) { cell.style.backgroundColor = '#fff0f2'; } 
 
-                cell.innerHTML = `<div class="day-header ${isToday ? 'today' : ''}">${displayDate}</div><div class="task-list" id="tasks-${dateStr}"></div><div class="add-task-btn" onclick="openModal('${dateStr}', '${displayDate}')">+ 新增</div>`;
+                cell.innerHTML = `<div class="day-header ${isToday ? 'today' : ''}">${displayDate}</div><div class="task-list" id="tasks-${dateStr}" style="flex-grow:1; overflow:hidden;"></div><div class="add-task-btn" onclick="openModal('${dateStr}')">+ 新增</div>`;
                 if (i < 7) week1Container.appendChild(cell); else week2Container.appendChild(cell);
             }
             
+            // 2. 判斷並塞入行程 (支援跨日行程在複數日期內的顯示)
             calendarTasks.forEach((task, index) => {
-                let taskContainer = document.getElementById(`tasks-${task.date}`);
-                if (taskContainer) {
-                    let tDiv = document.createElement('div'); tDiv.className = 'cal-task';
-                    let timeHTML = task.time ? `<span class="cal-time">⏰ ${task.time}</span>` : '';
-                    tDiv.innerHTML = `<button class="del-task" onclick="deleteTask(${index})">✖</button>${timeHTML}${task.title}`;
-                    taskContainer.appendChild(tDiv);
+                let startTS = new Date(task.startDate + 'T00:00:00').getTime();
+                let endTS = new Date(task.endDate + 'T00:00:00').getTime();
+                let isMultiDay = task.startDate !== task.endDate;
+
+                // 巡檢畫面上展示的 14 天
+                for(let i=0; i<14; i++) {
+                    let d = new Date(startOfViewWeek); d.setDate(d.getDate() + i);
+                    let dateStr = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+                    let currentCellTS = new Date(dateStr + 'T00:00:00').getTime();
+
+                    // 如果這一天落在行程的「開始」與「結束」日期之間，就把它渲染出來
+                    if(currentCellTS >= startTS && currentCellTS <= endTS) {
+                        let taskContainer = document.getElementById(`tasks-${dateStr}`);
+                        if (taskContainer) {
+                            let tDiv = document.createElement('div'); 
+                            tDiv.className = `cal-task ${isMultiDay ? 'multi-day' : ''}`;
+                            
+                            let timeHTML = task.time ? `<span class="cal-time">⏰ ${task.time}</span>` : '';
+                            // 跨日標籤小後綴
+                            let multiSuffix = isMultiDay ? ` <span style="opacity:0.6;font-size:9px;">(連)</span>` : '';
+
+                            tDiv.innerHTML = `<button class="del-task" onclick="deleteTask(${index})">✖</button>${timeHTML}${task.title}${multiSuffix}`;
+                            taskContainer.appendChild(tDiv);
+                        }
+                    }
                 }
             });
         }
         
         function changeWeek(offset) { currentViewDate.setDate(currentViewDate.getDate() + (offset * 7)); renderCalendar(); }
         function resetToToday() { currentViewDate = new Date(); renderCalendar(); }
-        function openModal(dateStr, displayDate) {
-            document.getElementById('modalDateStr').value = dateStr; document.getElementById('modalDateTitle').innerText = `新增行程：${displayDate}`;
-            document.getElementById('taskTitle').value = ''; document.getElementById('taskTime').value = '';
-            document.getElementById('taskReminderOffset').value = '0'; document.getElementById('taskReminderTime').value = '';
+        
+        function openModal(dateStr) {
+            document.getElementById('taskStartDate').value = dateStr; 
+            document.getElementById('taskEndDate').value = dateStr; 
+            document.getElementById('modalDateTitle').innerText = `新增行程排程`;
+            document.getElementById('taskTitle').value = ''; 
+            document.getElementById('taskTime').value = '';
+            document.getElementById('taskReminderOffset').value = '0'; 
+            document.getElementById('taskReminderTime').value = '';
             document.getElementById('taskModal').style.display = 'flex';
         }
         function closeModal() { document.getElementById('taskModal').style.display = 'none'; }
         
         function saveTask() {
-            let date = document.getElementById('modalDateStr').value; let title = document.getElementById('taskTitle').value; 
-            let time = document.getElementById('taskTime').value; let offset = parseInt(document.getElementById('taskReminderOffset').value);
+            let startDate = document.getElementById('taskStartDate').value;
+            let endDate = document.getElementById('taskEndDate').value;
+            let title = document.getElementById('taskTitle').value; 
+            let time = document.getElementById('taskTime').value; 
+            let offset = parseInt(document.getElementById('taskReminderOffset').value);
             let reminderTime = document.getElementById('taskReminderTime').value;
+            
+            if(!startDate || !endDate) { alert("請填寫完整的開始與結束日期！"); return; }
+            if(new Date(startDate) > new Date(endDate)) { alert("開始日期不能大於結束日期喔！"); return; }
             if(!title.trim()) { alert("請輸入行程內容！"); return; }
             
             let reminderTimestamp = null;
             if (reminderTime) {
-                let targetDate = new Date(date + 'T00:00:00'); targetDate.setDate(targetDate.getDate() - offset);
+                // 以第一天作為提醒的基準點
+                let targetDate = new Date(startDate + 'T00:00:00'); targetDate.setDate(targetDate.getDate() - offset);
                 reminderTimestamp = new Date(`${targetDate.getFullYear()}-${String(targetDate.getMonth()+1).padStart(2,'0')}-${String(targetDate.getDate()).padStart(2,'0')}T${reminderTime}`).getTime();
             }
-            calendarTasks.push({ id: 'task-' + Date.now() + Math.random(), date: date, title: title, time: time, reminderTimestamp: reminderTimestamp, isDismissed: false });
-            localStorage.setItem('myCalendarTasks', JSON.stringify(calendarTasks)); closeModal(); renderCalendar();
+            
+            calendarTasks.push({ 
+                id: 'task-' + Date.now() + Math.random(), 
+                startDate: startDate,
+                endDate: endDate,
+                title: title, 
+                time: time, 
+                reminderTimestamp: reminderTimestamp, 
+                isDismissed: false 
+            });
+            
+            localStorage.setItem('myCalendarTasks', JSON.stringify(calendarTasks)); 
+            closeModal(); 
+            renderCalendar();
         }
+        
         function deleteTask(index) {
-            if(confirm("確定刪除此行程嗎？")) {
+            if(confirm("確定刪除此排程嗎？(這會移除這段連續日期內的所有此標籤)")) {
                 let toastEl = document.getElementById(`toast-${calendarTasks[index].id}`); if (toastEl) toastEl.remove();
                 calendarTasks.splice(index, 1); localStorage.setItem('myCalendarTasks', JSON.stringify(calendarTasks)); renderCalendar();
             }
@@ -448,7 +505,7 @@
             if (index === -1) { currentEditingNoteIndex = -1; document.getElementById('nbTitleInput').value = ''; document.getElementById('nbContentInput').value = ''; } 
             else {
                 currentEditingNoteIndex = index; document.getElementById('nbTitleInput').value = meetingNotes[index].title; document.getElementById('nbContentInput').value = meetingNotes[index].content;
-                if(meetingNotes[index].audio) { tempAudioBase64 = meetingNotes[index].audio; createAudioPlayer(tempAudioBase64); document.getElementById('recordStatus').innerText = "🎙️ 已包含音音紀錄"; }
+                if(meetingNotes[index].audio) { tempAudioBase64 = meetingNotes[index].audio; createAudioPlayer(tempAudioBase64); document.getElementById('recordStatus').innerText = "🎙️ 已包含錄音紀錄"; }
             }
         }
         function closeNoteEditor() { if(mediaRecorder && mediaRecorder.state === "recording") { stopRecording(); } document.getElementById('notebookEditView').style.display = 'none'; document.getElementById('notebookListView').style.display = 'flex'; }
@@ -472,7 +529,7 @@
             const container = document.getElementById('audioPlayerContainer'); container.innerHTML = '';
             let audio = document.createElement('audio'); audio.controls = true; audio.src = base64Src;
             let downloadBtn = document.createElement('button'); downloadBtn.className = 'btn-outline'; downloadBtn.style.cssText = "margin-top:5px; font-size:12px; padding:6px; width:100%; color:#2b6cb0; background:#ebf8ff; border-color:#bee3f8;";
-            downloadBtn.innerText = "📥 下載音檔至電腦硬碟 (避免佔用同步容量)";
+            downloadBtn.innerText = "📥 下載音檔至電腦硬碟";
             downloadBtn.onclick = (e) => {
                 e.preventDefault(); let a = document.createElement('a'); a.href = base64Src;
                 a.download = `${document.getElementById('nbTitleInput').value || '語音備忘'}.webm`; a.click();
@@ -488,12 +545,11 @@
         }
         function deleteMeetingNote(index) { if(confirm("確定刪除此會議筆記嗎？")) { meetingNotes.splice(index, 1); localStorage.setItem('myMeetingNotes', JSON.stringify(meetingNotes)); renderMeetingNotes(); } }
 
-        // 智慧時空穿透巡檢 (過期未點銷，一律卡片常駐補發)
         function checkAndTriggerReminders() {
             let nowTime = new Date().getTime();
             calendarTasks.forEach((task) => {
                 if (task.reminderTimestamp && !task.isDismissed && nowTime >= task.reminderTimestamp) {
-                    showNotificationToast(task.id, 'cal', `行程預警通知 (主行程日: ${task.date})`, task.title);
+                    showNotificationToast(task.id, 'cal', `行程預警通知 (主行程日: ${task.startDate})`, task.title);
                 }
             });
             notes.forEach((note) => {
@@ -506,7 +562,6 @@
         window.addEventListener('resize', renderCalendar);
         setInterval(checkAndTriggerReminders, 10000);
         
-        // 初始載入
         renderCalendar(); renderNotes(); checkAndTriggerReminders(); 
     </script>
 </body>
