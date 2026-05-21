@@ -1,0 +1,513 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>智慧工作台 (手機/電腦同步版)</title>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; display: flex; flex-direction: column; padding: 20px; background: #f0f2f5; margin: 0; height: 100vh; box-sizing: border-box; gap: 15px;}
+        
+        /* 頂部全域控制列 (搜尋 + 同步按鈕) */
+        .top-bar { display: flex; gap: 15px; width: 100%; background: white; padding: 12px 20px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); box-sizing: border-box; flex-shrink: 0; align-items: center;}
+        .search-wrapper { position: relative; flex-grow: 1; }
+        .search-input { width: 100%; padding: 10px 15px; border: 1px solid #cbd5e0; border-radius: 8px; font-size: 15px; box-sizing: border-box; outline: none; }
+        .search-input:focus { border-color: #0066cc; box-shadow: 0 0 0 3px rgba(0,102,204,0.1); }
+        
+        .sync-controls { display: flex; gap: 8px; flex-shrink: 0; }
+        .btn-sync { background: #4a5568; color: white; border: none; padding: 10px 14px; border-radius: 8px; font-size: 14px; font-weight: bold; cursor: pointer; display: flex; align-items: center; gap: 5px;}
+        .btn-sync:hover { background: #2d3748; }
+        
+        .search-results-box { position: absolute; top: 100%; left: 0; right: 0; background: white; border-radius: 8px; box-shadow: 0 10px 25px rgba(0,0,0,0.15); max-height: 300px; overflow-y: auto; z-index: 2000; margin-top: 5px; border: 1px solid #e2e8f0; display: none;}
+        .search-item { padding: 12px 15px; border-bottom: 1px solid #edf2f7; font-size: 14px; color: #2d3748; line-height: 1.4; }
+        .search-item.click-action { cursor: pointer; }
+        .search-item.click-action:hover { background: #f7fafc; color: #0066cc; }
+        
+        .search-badge { display: inline-block; padding: 2px 6px; font-size: 11px; font-weight: bold; border-radius: 4px; margin-right: 8px; color: white; }
+        .badge-cal { background: #0066cc; }
+        .badge-note { background: #f59e0b; }
+        .badge-nb { background: #10b981; }
+
+        /* 主程式雙欄佈局 */
+        .app-container { display: flex; flex-grow: 1; gap: 20px; overflow: hidden; width: 100%; height: calc(100% - 65px); }
+        .panel { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); overflow-y: auto; height: 100%; box-sizing: border-box;}
+        .calendar-panel { width: 60%; }
+        .right-panel { width: 40%; background: #fafafa; display: flex; flex-direction: column; overflow: hidden;}
+        
+        h2 { color: #333; border-bottom: 2px solid #e0e5ec; padding-bottom: 10px; margin-top: 0; display: flex; justify-content: space-between; align-items: center;}
+        
+        /* 行事曆翻頁控制 */
+        .cal-controls { display: flex; gap: 8px; font-size: 14px; }
+        .cal-controls button { background: #fff; border: 1px solid #ccc; padding: 5px 10px; border-radius: 5px; cursor: pointer; color: #333; }
+        .cal-controls button:hover { background: #e9ecef; }
+        .cal-controls button.btn-today { background: #e3f2fd; color: #0066cc; border-color: #0066cc; font-weight: bold;}
+
+        /* 行事曆 14 天網格 */
+        .week-title { font-weight: bold; margin: 15px 0 5px 0; color: #555; }
+        .calendar-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 8px; margin-bottom: 15px;}
+        .day-cell { border: 1px solid #e0e0e0; border-radius: 8px; min-height: 110px; display: flex; flex-direction: column; background: #fff; padding: 6px; box-sizing: border-box;}
+        .day-header { text-align: center; font-size: 13px; font-weight: bold; padding-bottom: 4px; border-bottom: 1px solid #eee; margin-bottom: 6px; color: #666;}
+        .day-header.today { background: #0066cc; color: white; border-radius: 4px; border: none; padding: 2px 0;}
+        
+        .cal-task { background: #e3f2fd; border-left: 3px solid #0066cc; padding: 4px; font-size: 11px; border-radius: 3px; margin-bottom: 4px; position: relative; word-break: break-all;}
+        .cal-task .del-task { float: right; color: #999; cursor: pointer; border: none; background: none; font-size: 10px; padding: 0;}
+        .cal-time { font-weight: bold; color: #d32f2f; display: block; }
+        .add-task-btn { margin-top: auto; background: #f8f9fa; border: 1px dashed #ccc; cursor: pointer; padding: 4px; border-radius: 4px; color: #666; font-size: 11px; text-align: center;}
+        .add-task-btn:hover { background: #e9ecef; }
+
+        /* 頁籤系統 */
+        .tabs { display: flex; border-bottom: 2px solid #ccc; margin-bottom: 15px; flex-shrink: 0;}
+        .tab-btn { background: none; border: none; padding: 10px 15px; font-size: 15px; cursor: pointer; color: #666; border-radius: 8px 8px 0 0; margin-bottom: -2px; font-weight: bold;}
+        .tab-btn.active { background: #0066cc; color: white; border: 2px solid #0066cc; border-bottom: none; }
+        .tab-content { display: none; flex-direction: column; flex-grow: 1; overflow-y: auto;}
+        .tab-content.active { display: flex; }
+
+        /* 便利貼樣式 */
+        .input-group { display: flex; flex-direction: column; gap: 10px; margin-bottom: 15px; background: #fff; padding: 15px; border-radius: 8px; border: 1px solid #ddd; flex-shrink: 0;}
+        textarea, input[type="text"], select { width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 5px; resize: vertical; font-size: 14px; box-sizing: border-box; font-family: inherit;}
+        input[type="datetime-local"], input[type="time"] { padding: 8px; border: 1px solid #ccc; border-radius: 5px; font-family: inherit;}
+        button.primary-btn { background: #0066cc; color: white; border: none; padding: 10px; border-radius: 5px; cursor: pointer; font-size: 16px; font-weight: bold;}
+        button.primary-btn:hover { background: #0052a3; }
+        
+        .note { background: #fff59d; padding: 15px; margin-bottom: 15px; border-radius: 8px; box-shadow: 2px 2px 8px rgba(0,0,0,0.1); position: relative;}
+        .note.urgent { background: #ffcdd2; border-left: 4px solid #f44336; } 
+        .note.done { background: #e0e0e0; opacity: 0.7; } 
+        .note-header { display: flex; justify-content: space-between; margin-bottom: 8px; align-items: center;}
+        .done-checkbox { transform: scale(1.3); cursor: pointer;}
+        .delete-btn { background: none; border: none; color: #999; cursor: pointer; font-size: 14px;}
+        .delete-btn:hover { color: red; }
+        .note-text { margin: 0 0 10px 0; white-space: pre-wrap; line-height: 1.5; color: #333;}
+        .note.done .note-text { text-decoration: line-through; color: #666; }
+        .note-meta { font-size: 0.8em; color: #666; display: flex; justify-content: space-between; border-top: 1px dashed #ccc; padding-top: 8px;}
+
+        /* 會議筆記與錄音 */
+        .notebook-item { background: #fff; padding: 15px; border-radius: 8px; border: 1px solid #ddd; margin-bottom: 10px; cursor: pointer;}
+        .notebook-item:hover { border-color: #0066cc; }
+        .editor-view { display: none; flex-direction: column; gap: 12px; height: 100%;}
+        .recorder-box { background: #edf2f7; padding: 12px; border-radius: 8px; border: 1px solid #cbd5e0; display: flex; flex-direction: column; gap: 8px;}
+        .recorder-btns { display: flex; gap: 8px; }
+        .recorder-btns button { flex: 1; padding: 6px; font-size: 13px; border-radius: 4px; border: 1px solid #ccc; cursor: pointer;}
+        audio { width: 100%; margin-top: 5px; }
+
+        /* 彈出彈窗 */
+        .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000; justify-content: center; align-items: center;}
+        .modal { background: white; padding: 25px; border-radius: 10px; width: 90%; max-width: 360px; display: flex; flex-direction: column; gap: 12px;}
+        .modal-actions { display: flex; justify-content: flex-end; gap: 10px;}
+        .modal-actions button { padding: 8px 15px; cursor: pointer; border-radius: 5px; border: none;}
+
+        /* 右上角常駐通知中心 */
+        .notification-container { position: fixed; top: 20px; right: 20px; z-index: 3000; display: flex; flex-direction: column; gap: 10px; width: 300px; max-height: 90vh; overflow-y: auto; pointer-events: none; }
+        .notification-toast { background: #fff5f5; border-left: 5px solid #ff4d4f; padding: 15px; border-radius: 8px; box-shadow: 0 4px 15px rgba(0,0,0,0.15); position: relative; pointer-events: auto; box-sizing: border-box; }
+        .toast-close-btn { position: absolute; top: 10px; right: 10px; background: none; border: none; color: #999; cursor: pointer; font-size: 16px; font-weight: bold; }
+        .toast-title { font-weight: bold; color: #d32f2f; font-size: 14px; margin-bottom: 6px; }
+        .toast-msg { font-size: 13px; color: #333; white-space: pre-wrap; word-break: break-all; max-height: 100px; overflow-y: auto;}
+
+        /* 📱 RWD 手機響應式介面優化 📱 */
+        @media (max-width: 1024px) {
+            body { height: auto; overflow-y: auto; padding: 10px; gap: 10px;}
+            .top-bar { flex-direction: column; align-items: stretch; gap: 10px; padding: 10px; }
+            .sync-controls { justify-content: space-between; }
+            .sync-controls button { flex: 1; justify-content: center; }
+            .app-container { flex-direction: column; height: auto; overflow: visible; gap: 15px; }
+            .panel { width: 100% !important; height: auto !important; overflow: visible; padding: 15px; }
+            .calendar-grid { grid-template-columns: repeat(2, 1fr); } /* 手機改為雙列，點擊最舒服 */
+            .day-cell { min-height: 130px; }
+            .notification-container { width: calc(100% - 40px); left: 20px; right: 20px; top: 10px; }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- 頂部智慧搜尋與同步面板 -->
+    <div class="top-bar">
+        <div class="search-wrapper">
+            <input type="text" id="globalSearchInput" class="search-input" placeholder="🔍 輸入關鍵字，一鍵搜穿行事曆、便利貼(含已放假/處理)、會議筆記本..." oninput="performGlobalSearch()">
+            <div id="searchResultsPanel" class="search-results-box"></div>
+        </div>
+        
+        <div class="sync-controls">
+            <button class="btn-sync" onclick="exportAllData()">📤 匯出資料</button>
+            <button class="btn-sync" onclick="document.getElementById('importFileInput').click()">📥 匯入資料</button>
+            <input type="file" id="importFileInput" style="display: none;" onchange="importAllData(event)" accept=".json">
+        </div>
+    </div>
+
+    <div class="app-container">
+        <!-- 左側：雙週行事曆 -->
+        <div class="panel calendar-panel">
+            <h2>
+                <span>📅 雙週行事曆</span>
+                <div class="cal-controls">
+                    <button onclick="changeWeek(-1)">◀ 上週</button>
+                    <button class="btn-today" onclick="resetToToday()">本週</button>
+                    <button onclick="changeWeek(1)">下週 ▶</button>
+                </div>
+            </h2>
+            <div class="week-title" id="week1Title">▼ 第一週</div>
+            <div class="calendar-grid" id="week1Grid"></div>
+            <div class="week-title" id="week2Title">▼ 第二週</div>
+            <div class="calendar-grid" id="week2Grid"></div>
+        </div>
+
+        <!-- 右側：智慧看板 -->
+        <div class="panel right-panel">
+            <div class="tabs">
+                <button class="tab-btn active" id="btnTabSticky" onclick="switchTab('sticky')">📝 智慧便利貼</button>
+                <button class="tab-btn" id="btnTabNotebook" onclick="switchTab('notebook')">📓 會議筆記本</button>
+            </div>
+
+            <!-- 頁籤 1：智慧便利貼 -->
+            <div id="tabSticky" class="tab-content active">
+                <div class="input-group">
+                    <textarea id="noteInput" placeholder="輸入隨手待辦..." style="height: 50px;"></textarea>
+                    <div class="note-options">
+                        <label style="cursor:pointer; color: #d32f2f; font-weight:bold;"><input type="checkbox" id="urgentInput"> 🚨 標記為急件</label>
+                    </div>
+                    <label style="font-size: 12px; color: #555;">提醒時間：</label>
+                    <input type="datetime-local" id="reminderInput">
+                    <button class="primary-btn" onclick="addNote()">新增便利貼</button>
+                </div>
+                <div class="board-header">
+                    <span style="font-weight: bold; color: #555;">進行中事項</span>
+                    <label style="font-size: 14px; cursor: pointer; color: #0066cc;"><input type="checkbox" id="showDoneInput" onchange="renderNotes()"> 顯示已處理</label>
+                </div>
+                <div id="notesContainer"></div>
+            </div>
+
+            <!-- 頁籤 2：會議筆記本 -->
+            <div id="tabNotebook" class="tab-content">
+                <div id="notebookListView" style="display: flex; flex-direction: column; flex-grow: 1;">
+                    <button class="primary-btn" style="margin-bottom: 15px;" onclick="openNoteEditor(-1)">+ 新增筆記</button>
+                    <div id="notebookListContainer"></div>
+                </div>
+                
+                <div id="notebookEditView" class="editor-view">
+                    <input type="text" id="nbTitleInput" placeholder="筆記標題">
+                    <div class="recorder-box">
+                        <div class="recorder-status" id="recordStatus">🎙️ 語音備忘：就緒</div>
+                        <div class="recorder-btns">
+                            <button style="background:#fff;" id="btnStartRecord" onclick="startRecording()">🔴 開始錄音</button>
+                            <button style="background:#e53e3e; color:white; display:none;" id="btnStopRecord" onclick="stopRecording()">🛑 停止錄音</button>
+                        </div>
+                        <div id="audioPlayerContainer"></div>
+                    </div>
+                    <textarea id="nbContentInput" placeholder="在此輸入詳細開會紀錄..." style="flex-grow: 1; min-height: 150px;"></textarea>
+                    <div class="editor-actions">
+                        <button class="btn-outline" style="flex: 1;" onclick="closeNoteEditor()">返回</button>
+                        <button class="primary-btn" style="flex: 2;" onclick="saveMeetingNote()">💾 儲存筆記</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 新增行程對話框 -->
+    <div class="modal-overlay" id="taskModal">
+        <div class="modal">
+            <h3 style="margin:0;" id="modalDateTitle">新增行程</h3>
+            <input type="hidden" id="modalDateStr">
+            <input type="text" id="taskTitle" placeholder="行程內容">
+            <input type="time" id="taskTime">
+            <fieldset style="border: 1px solid #cbd5e0; border-radius: 6px; padding: 10px;">
+                <legend style="font-size: 12px; color: #0066cc; font-weight: bold;">🔔 提前預警</legend>
+                <select id="taskReminderOffset">
+                    <option value="0">當天提醒</option>
+                    <option value="1">1 天前提醒</option>
+                    <option value="2">2 天前提醒</option>
+                    <option value="3">3 天前提醒</option>
+                </select>
+                <input type="time" id="taskReminderTime" style="margin-top:5px; width:100%; padding:5px; box-sizing:border-box;">
+            </fieldset>
+            <div class="modal-actions">
+                <button class="btn-cancel" onclick="closeModal()">取消</button>
+                <button class="btn-save" onclick="saveTask()">儲存</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 右上角常駐通知容器 -->
+    <div class="notification-container" id="notificationContainer"></div>
+
+    <script>
+        let calendarTasks = JSON.parse(localStorage.getItem('myCalendarTasks')) || [];
+        let notes = JSON.parse(localStorage.getItem('myStickyNotes')) || [];
+        let meetingNotes = JSON.parse(localStorage.getItem('myMeetingNotes')) || [];
+        
+        // 自動防錯修補 ID
+        calendarTasks.forEach(t => { if(!t.id) t.id = 'task-' + Math.random() + Date.now(); if(t.isNotified && t.isDismissed === undefined) t.isDismissed = true; });
+        notes.forEach(n => { if(!n.id) n.id = 'note-' + Math.random() + Date.now(); if(n.isNotified && n.isDismissed === undefined) n.isDismissed = true; });
+
+        const weekDays = ['日', '一', '二', '三', '四', '五', '六'];
+        let currentViewDate = new Date(); let currentEditingNoteIndex = -1;
+        let mediaRecorder; let audioChunks = []; let tempAudioBase64 = null;
+        
+        // 2026年常見國定假日
+        const nationalHolidays = ['2026-01-01', '2026-02-28', '2026-04-03', '2026-04-04', '2026-05-01', '2026-10-10'];
+        let activeToasts = {};
+
+        // 雲端備份匯出
+        function exportAllData() {
+            let dataBundle = { calendarTasks: calendarTasks, notes: notes, meetingNotes: meetingNotes };
+            let blob = new Blob([JSON.stringify(dataBundle)], { type: "application/json" });
+            let url = URL.createObjectURL(blob);
+            let a = document.createElement('a');
+            a.href = url;
+            a.download = `智慧工作台備份_${new Date().toISOString().slice(0,10)}.json`;
+            a.click();
+        }
+
+        // 雲端備份匯入
+        function importAllData(event) {
+            let file = event.target.files[0]; if (!file) return;
+            let reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    let imported = JSON.parse(e.target.result);
+                    if (imported.calendarTasks && imported.notes && imported.meetingNotes) {
+                        if (confirm("匯入將會完全覆蓋此裝置的舊有資料，確定執行？")) {
+                            localStorage.setItem('myCalendarTasks', JSON.stringify(imported.calendarTasks));
+                            localStorage.setItem('myStickyNotes', JSON.stringify(imported.notes));
+                            localStorage.setItem('myMeetingNotes', JSON.stringify(imported.meetingNotes));
+                            alert("🎉 資料同步成功！"); location.reload();
+                        }
+                    } else { alert("備份檔案格式不符。"); }
+                } catch (err) { alert("讀取失敗，請確認檔案格式。"); }
+            };
+            reader.readAsText(file);
+        }
+
+        // 右上角常駐通知機制
+        function showNotificationToast(id, type, title, message) {
+            if (activeToasts[id]) return; activeToasts[id] = true;
+            const container = document.getElementById('notificationContainer');
+            let toast = document.createElement('div'); toast.className = 'notification-toast'; toast.id = `toast-${id}`;
+            toast.innerHTML = `<button class="toast-close-btn" onclick="dismissNotification('${id}', '${type}')">✖</button><div class="toast-title">🔔 ${title}</div><div class="toast-msg">${message}</div>`;
+            container.appendChild(toast);
+        }
+        
+        function dismissNotification(id, type) {
+            delete activeToasts[id]; let toastEl = document.getElementById(`toast-${id}`); if (toastEl) toastEl.remove();
+            if (type === 'cal') {
+                let task = calendarTasks.find(t => t.id === id); if (task) task.isDismissed = true;
+                localStorage.setItem('myCalendarTasks', JSON.stringify(calendarTasks)); renderCalendar();
+            } else if (type === 'note') {
+                let note = notes.find(n => n.id === id); if (note) note.isDismissed = true;
+                localStorage.setItem('myStickyNotes', JSON.stringify(notes)); renderNotes();
+            }
+        }
+
+        // 全域智慧關鍵字搜尋
+        function performGlobalSearch() {
+            const query = document.getElementById('globalSearchInput').value.trim().toLowerCase();
+            const panel = document.getElementById('searchResultsPanel');
+            if (!query) { panel.style.display = 'none'; return; }
+            panel.innerHTML = ''; let totalMatches = 0;
+            
+            calendarTasks.forEach(task => {
+                if (task.title.toLowerCase().includes(query)) {
+                    totalMatches++; panel.innerHTML += `<div class="search-item"><span class="search-badge badge-cal">📅 行事曆</span><strong>${task.date}</strong> ➜ ${task.title}</div>`;
+                }
+            });
+            notes.forEach(note => {
+                if (note.text.toLowerCase().includes(query)) {
+                    totalMatches++; let statusLabel = note.isDone ? '[已結案]' : '[進行中]';
+                    panel.innerHTML += `<div class="search-item"><span class="search-badge badge-note">📝 便利貼</span><strong>${statusLabel}</strong> ➜ ${note.text}</div>`;
+                }
+            });
+            meetingNotes.forEach((note, index) => {
+                if (note.title.toLowerCase().includes(query) || note.content.toLowerCase().includes(query)) {
+                    totalMatches++; panel.innerHTML += `<div class="search-item click-action" onclick="jumpToMeetingNoteFromSearch(${index})"><span class="search-badge badge-nb">📓 筆記本</span><strong>${note.title}</strong></div>`;
+                }
+            });
+            if (totalMatches > 0) { panel.style.display = 'block'; } else { panel.innerHTML = `<div class="search-item" style="color:#999; text-align:center;">無相符資料</div>`; panel.style.display = 'block'; }
+        }
+        function jumpToMeetingNoteFromSearch(index) { switchTab('notebook'); openNoteEditor(index); document.getElementById('globalSearchInput').value = ''; document.getElementById('searchResultsPanel').style.display = 'none'; }
+        document.addEventListener('click', function(e) { const wrapper = document.querySelector('.search-wrapper'); if (wrapper && !wrapper.contains(e.target)) { document.getElementById('searchResultsPanel').style.display = 'none'; } });
+
+        // 頁籤切換
+        function switchTab(tabName) {
+            document.getElementById('btnTabSticky').classList.remove('active'); document.getElementById('btnTabNotebook').classList.remove('active');
+            document.getElementById('tabSticky').classList.remove('active'); document.getElementById('tabNotebook').classList.remove('active');
+            if(tabName === 'sticky') { document.getElementById('btnTabSticky').classList.add('active'); document.getElementById('tabSticky').classList.add('active'); } 
+            else { document.getElementById('btnTabNotebook').classList.add('active'); document.getElementById('tabNotebook').classList.add('active'); renderMeetingNotes(); }
+        }
+
+        // 行事曆渲染
+        function renderCalendar() {
+            const week1Container = document.getElementById('week1Grid'); const week2Container = document.getElementById('week2Grid');
+            week1Container.innerHTML = ''; week2Container.innerHTML = '';
+            let tempDate = new Date(currentViewDate); let dayOfWeek = tempDate.getDay();
+            let diffToMonday = tempDate.getDate() - dayOfWeek + (dayOfWeek === 0 ? -6 : 1); 
+            let startOfViewWeek = new Date(tempDate.setDate(diffToMonday));
+            document.getElementById('week1Title').innerText = `▼ ${startOfViewWeek.getMonth() + 1}月 第一週`;
+            let realToday = new Date().toDateString();
+
+            for (let i = 0; i < 14; i++) {
+                let d = new Date(startOfViewWeek); d.setDate(d.getDate() + i);
+                if (i === 7) document.getElementById('week2Title').innerText = `▼ ${d.getMonth() + 1}月 第二週`;
+                let dateStr = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+                
+                let isMobile = window.innerWidth <= 1024;
+                let displayDate = isMobile ? `${d.getMonth()+1}/${d.getDate()}` : `${d.getMonth()+1}/${d.getDate()} (${weekDays[d.getDay()]})`;
+                
+                let isToday = (realToday === d.toDateString());
+                let isWeekend = (d.getDay() === 0 || d.getDay() === 6);
+                let isHoliday = nationalHolidays.includes(dateStr);
+
+                let cell = document.createElement('div'); cell.className = 'day-cell';
+                if (isWeekend || isHoliday) { cell.style.backgroundColor = '#fff0f2'; } // 假日淺粉紅底色
+
+                cell.innerHTML = `<div class="day-header ${isToday ? 'today' : ''}">${displayDate}</div><div class="task-list" id="tasks-${dateStr}"></div><div class="add-task-btn" onclick="openModal('${dateStr}', '${displayDate}')">+ 新增</div>`;
+                if (i < 7) week1Container.appendChild(cell); else week2Container.appendChild(cell);
+            }
+            
+            calendarTasks.forEach((task, index) => {
+                let taskContainer = document.getElementById(`tasks-${task.date}`);
+                if (taskContainer) {
+                    let tDiv = document.createElement('div'); tDiv.className = 'cal-task';
+                    let timeHTML = task.time ? `<span class="cal-time">⏰ ${task.time}</span>` : '';
+                    tDiv.innerHTML = `<button class="del-task" onclick="deleteTask(${index})">✖</button>${timeHTML}${task.title}`;
+                    taskContainer.appendChild(tDiv);
+                }
+            });
+        }
+        
+        function changeWeek(offset) { currentViewDate.setDate(currentViewDate.getDate() + (offset * 7)); renderCalendar(); }
+        function resetToToday() { currentViewDate = new Date(); renderCalendar(); }
+        function openModal(dateStr, displayDate) {
+            document.getElementById('modalDateStr').value = dateStr; document.getElementById('modalDateTitle').innerText = `新增行程：${displayDate}`;
+            document.getElementById('taskTitle').value = ''; document.getElementById('taskTime').value = '';
+            document.getElementById('taskReminderOffset').value = '0'; document.getElementById('taskReminderTime').value = '';
+            document.getElementById('taskModal').style.display = 'flex';
+        }
+        function closeModal() { document.getElementById('taskModal').style.display = 'none'; }
+        
+        function saveTask() {
+            let date = document.getElementById('modalDateStr').value; let title = document.getElementById('taskTitle').value; 
+            let time = document.getElementById('taskTime').value; let offset = parseInt(document.getElementById('taskReminderOffset').value);
+            let reminderTime = document.getElementById('taskReminderTime').value;
+            if(!title.trim()) { alert("請輸入行程內容！"); return; }
+            
+            let reminderTimestamp = null;
+            if (reminderTime) {
+                let targetDate = new Date(date + 'T00:00:00'); targetDate.setDate(targetDate.getDate() - offset);
+                reminderTimestamp = new Date(`${targetDate.getFullYear()}-${String(targetDate.getMonth()+1).padStart(2,'0')}-${String(targetDate.getDate()).padStart(2,'0')}T${reminderTime}`).getTime();
+            }
+            calendarTasks.push({ id: 'task-' + Date.now() + Math.random(), date: date, title: title, time: time, reminderTimestamp: reminderTimestamp, isDismissed: false });
+            localStorage.setItem('myCalendarTasks', JSON.stringify(calendarTasks)); closeModal(); renderCalendar();
+        }
+        function deleteTask(index) {
+            if(confirm("確定刪除此行程嗎？")) {
+                let toastEl = document.getElementById(`toast-${calendarTasks[index].id}`); if (toastEl) toastEl.remove();
+                calendarTasks.splice(index, 1); localStorage.setItem('myCalendarTasks', JSON.stringify(calendarTasks)); renderCalendar();
+            }
+        }
+
+        // 便利貼管理
+        function renderNotes() {
+            const container = document.getElementById('notesContainer'); const showDone = document.getElementById('showDoneInput').checked; container.innerHTML = '';
+            notes.forEach((note, index) => {
+                if (note.isDone && !showDone) return;
+                let noteDiv = document.createElement('div'); noteDiv.className = `note ${note.isUrgent ? 'urgent' : ''} ${note.isDone ? 'done' : ''}`;
+                let urgentBadge = note.isUrgent ? `<span style="background:#f44336; color:white; font-size:11px; padding:2px 6px; border-radius:3px; font-weight:bold; margin-left:5px;">🚨 急件</span>` : ``;
+                let reminderHTML = note.reminderTime ? `<span style="color:#d32f2f; font-weight:bold;">🔔 ${new Date(note.reminderTime).toLocaleString()}</span>` : `<span></span>`;
+                noteDiv.innerHTML = `<div class="note-header"><div><input type="checkbox" class="done-checkbox" ${note.isDone ? 'checked' : ''} onchange="toggleDone(${index}, this.checked)">${urgentBadge}</div><button class="delete-btn" onclick="deleteNote(${index})">🗑️</button></div><p class="note-text">${note.text}</p><div class="note-meta"><span>使用日期: ${note.usedDate}</span>${reminderHTML}</div>`;
+                container.appendChild(noteDiv);
+            });
+        }
+        function addNote() {
+            let text = document.getElementById('noteInput').value; let reminder = document.getElementById('reminderInput').value; let isUrgent = document.getElementById('urgentInput').checked;
+            if (!text.trim()) { alert("請輸入便利貼內容！"); return; }
+            notes.unshift({ id: 'note-' + Date.now() + Math.random(), text: text, usedDate: new Date().toLocaleDateString('zh-TW'), reminderTime: reminder ? new Date(reminder).getTime() : null, isDismissed: false, isUrgent: isUrgent, isDone: false });
+            localStorage.setItem('myStickyNotes', JSON.stringify(notes)); document.getElementById('noteInput').value = ''; document.getElementById('reminderInput').value = ''; document.getElementById('urgentInput').checked = false; renderNotes();
+        }
+        function toggleDone(index, isChecked) { notes[index].isDone = isChecked; localStorage.setItem('myStickyNotes', JSON.stringify(notes)); renderNotes(); }
+        function deleteNote(index) {
+            if(confirm("確定永久刪除此便利貼嗎？")) {
+                let toastEl = document.getElementById(`toast-${notes[index].id}`); if (toastEl) toastEl.remove();
+                notes.splice(index, 1); localStorage.setItem('myStickyNotes', JSON.stringify(notes)); renderNotes();
+            }
+        }
+
+        // 會議筆記與音訊錄製
+        function renderMeetingNotes() {
+            const container = document.getElementById('notebookListContainer'); container.innerHTML = '';
+            if(meetingNotes.length === 0) { container.innerHTML = `<p style="text-align:center; color:#999; margin-top:20px;">目前沒有任何筆記</p>`; return; }
+            meetingNotes.forEach((note, index) => {
+                let div = document.createElement('div'); div.className = 'notebook-item'; div.onclick = () => openNoteEditor(index);
+                let previewText = note.content.replace(/\n/g, ' ').substring(0, 30) + (note.content.length > 30 ? '...' : '');
+                let audioIcon = note.audio ? `<span style="color:#0066cc; font-size:12px; font-weight:bold;"> 🎙️ 內含錄音備忘</span>` : '';
+                div.innerHTML = `<div class="nb-header"><div class="nb-title">📓 ${note.title} ${audioIcon}</div><button class="delete-btn" onclick="event.stopPropagation(); deleteMeetingNote(${index})">🗑️</button></div><div class="nb-date">更新於：${note.date}</div><div class="nb-preview">${previewText}</div>`;
+                container.appendChild(div);
+            });
+        }
+
+        function openNoteEditor(index) {
+            document.getElementById('notebookListView').style.display = 'none'; document.getElementById('notebookEditView').style.display = 'flex';
+            document.getElementById('recordStatus').innerText = "🎙️ 語音備忘：就緒"; document.getElementById('btnStartRecord').style.display = 'block';
+            document.getElementById('btnStopRecord').style.display = 'none'; document.getElementById('audioPlayerContainer').innerHTML = ''; tempAudioBase64 = null;
+            if (index === -1) { currentEditingNoteIndex = -1; document.getElementById('nbTitleInput').value = ''; document.getElementById('nbContentInput').value = ''; } 
+            else {
+                currentEditingNoteIndex = index; document.getElementById('nbTitleInput').value = meetingNotes[index].title; document.getElementById('nbContentInput').value = meetingNotes[index].content;
+                if(meetingNotes[index].audio) { tempAudioBase64 = meetingNotes[index].audio; createAudioPlayer(tempAudioBase64); document.getElementById('recordStatus').innerText = "🎙️ 已包含音音紀錄"; }
+            }
+        }
+        function closeNoteEditor() { if(mediaRecorder && mediaRecorder.state === "recording") { stopRecording(); } document.getElementById('notebookEditView').style.display = 'none'; document.getElementById('notebookListView').style.display = 'flex'; }
+
+        function startRecording() {
+            audioChunks = []; navigator.mediaDevices.getUserMedia({ audio: true }).then(stream => {
+                mediaRecorder = new MediaRecorder(stream); mediaRecorder.start();
+                document.getElementById('recordStatus').innerHTML = "<span style='color:red;'>🔴 錄音中...請口述紀錄</span>";
+                document.getElementById('btnStartRecord').style.display = 'none'; document.getElementById('btnStopRecord').style.display = 'block';
+                mediaRecorder.ondataavailable = event => { audioChunks.push(event.data); };
+                mediaRecorder.onstop = () => {
+                    let audioBlob = new Blob(audioChunks, { type: 'audio/webm' }); let reader = new FileReader(); reader.readAsDataURL(audioBlob);
+                    reader.onloadend = function() { tempAudioBase64 = reader.result; createAudioPlayer(tempAudioBase64); document.getElementById('recordStatus').innerText = "🎙️ 錄音完成！(請記得點選儲存)"; }
+                    stream.getTracks().forEach(track => track.stop());
+                };
+            }).catch(err => { alert("無法啟動麥克風，請確認網址是否為 HTTPS 連線或給予麥克風權限！"); });
+        }
+        function stopRecording() { if(mediaRecorder && mediaRecorder.state === "recording") { mediaRecorder.stop(); document.getElementById('btnStartRecord').style.display = 'block'; document.getElementById('btnStopRecord').style.display = 'none'; } }
+
+        function createAudioPlayer(base64Src) {
+            const container = document.getElementById('audioPlayerContainer'); container.innerHTML = '';
+            let audio = document.createElement('audio'); audio.controls = true; audio.src = base64Src;
+            let downloadBtn = document.createElement('button'); downloadBtn.className = 'btn-outline'; downloadBtn.style.cssText = "margin-top:5px; font-size:12px; padding:6px; width:100%; color:#2b6cb0; background:#ebf8ff; border-color:#bee3f8;";
+            downloadBtn.innerText = "📥 下載音檔至電腦硬碟 (避免佔用同步容量)";
+            downloadBtn.onclick = (e) => {
+                e.preventDefault(); let a = document.createElement('a'); a.href = base64Src;
+                a.download = `${document.getElementById('nbTitleInput').value || '語音備忘'}.webm`; a.click();
+            };
+            container.appendChild(audio); container.appendChild(downloadBtn);
+        }
+
+        function saveMeetingNote() {
+            let title = document.getElementById('nbTitleInput').value || '未命名筆記'; let content = document.getElementById('nbContentInput').value; let dateStr = new Date().toLocaleString('zh-TW');
+            if (currentEditingNoteIndex === -1) { meetingNotes.unshift({ title: title, content: content, date: dateStr, audio: tempAudioBase64 }); } 
+            else { meetingNotes[currentEditingNoteIndex].title = title; meetingNotes[currentEditingNoteIndex].content = content; meetingNotes[currentEditingNoteIndex].date = dateStr; meetingNotes[currentEditingNoteIndex].audio = tempAudioBase64; }
+            localStorage.setItem('myMeetingNotes', JSON.stringify(meetingNotes)); closeNoteEditor(); renderMeetingNotes();
+        }
+        function deleteMeetingNote(index) { if(confirm("確定刪除此會議筆記嗎？")) { meetingNotes.splice(index, 1); localStorage.setItem('myMeetingNotes', JSON.stringify(meetingNotes)); renderMeetingNotes(); } }
+
+        // 智慧時空穿透巡檢 (過期未點銷，一律卡片常駐補發)
+        function checkAndTriggerReminders() {
+            let nowTime = new Date().getTime();
+            calendarTasks.forEach((task) => {
+                if (task.reminderTimestamp && !task.isDismissed && nowTime >= task.reminderTimestamp) {
+                    showNotificationToast(task.id, 'cal', `行程預警通知 (主行程日: ${task.date})`, task.title);
+                }
+            });
+            notes.forEach((note) => {
+                if (!note.isDone && note.reminderTime && !note.isDismissed && nowTime >= note.reminderTime) {
+                    showNotificationToast(note.id, 'note', `智慧便利貼時效提醒`, note.text);
+                }
+            });
+        }
+
+        window.addEventListener('resize', renderCalendar);
+        setInterval(checkAndTriggerReminders, 10000);
+        
+        // 初始載入
+        renderCalendar(); renderNotes(); checkAndTriggerReminders(); 
+    </script>
+</body>
+</html>
