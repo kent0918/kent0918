@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>智慧工作台 (多視角行事曆完美修正版)</title>
+    <title>智慧工作台 (便利貼優化完全體)</title>
     <style>
         body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; display: flex; flex-direction: column; padding: 20px; background: #f0f2f5; margin: 0; height: 100vh; box-sizing: border-box; gap: 15px;}
         
@@ -81,17 +81,22 @@
         input[type="datetime-local"], input[type="time"], input[type="date"] { padding: 8px; border: 1px solid #ccc; border-radius: 5px; font-family: inherit; font-size: 14px; box-sizing: border-box;}
         button.primary-btn { background: #0066cc; color: white; border: none; padding: 10px; border-radius: 5px; cursor: pointer; font-size: 16px; font-weight: bold;}
         button.primary-btn:hover { background: #0052a3; }
+        button.secondary-btn { background: #e2e8f0; color: #4a5568; border: 1px solid #cbd5e0; padding: 8px; border-radius: 5px; cursor: pointer; font-size: 14px; font-weight: bold;}
+        button.secondary-btn:hover { background: #edf2f7; }
         
-        .note { background: #fff59d; padding: 15px; margin-bottom: 15px; border-radius: 8px; box-shadow: 2px 2px 8px rgba(0,0,0,0.1); position: relative;}
+        /* 便利貼卡片樣式 */
+        .note { background: #fff59d; padding: 15px; margin-bottom: 15px; border-radius: 8px; box-shadow: 2px 2px 8px rgba(0,0,0,0.1); position: relative; cursor: pointer; transition: transform 0.2s, box-shadow 0.2s;}
+        .note:hover { transform: translateY(-2px); box-shadow: 2px 5px 12px rgba(0,0,0,0.15); background: #fff9c4;}
         .note.urgent { background: #ffcdd2; border-left: 4px solid #f44336; } 
+        .note.urgent:hover { background: #ffebee; }
         .note.done { background: #e0e0e0; opacity: 0.7; } 
         .note-header { display: flex; justify-content: space-between; margin-bottom: 8px; align-items: center;}
-        .done-checkbox { transform: scale(1.3); cursor: pointer;}
+        .done-checkbox { transform: scale(1.3); cursor: pointer; width: 18px; height: 18px;}
         .delete-btn { background: none; border: none; color: #999; cursor: pointer; font-size: 14px;}
         .delete-btn:hover { color: red; }
         .note-text { margin: 0 0 10px 0; white-space: pre-wrap; line-height: 1.5; color: #333;}
         .note.done .note-text { text-decoration: line-through; color: #666; }
-        .note-meta { font-size: 0.8em; color: #666; display: flex; justify-content: space-between; border-top: 1px dashed #ccc; padding-top: 8px;}
+        .note-meta { font-size: 0.8em; color: #666; display: flex; justify-content: space-between; border-top: 1px dashed #ccc; padding-top: 8px; pointer-events: none;}
 
         /* 會議筆記與錄音 */
         .notebook-item { background: #fff; padding: 15px; border-radius: 8px; border: 1px solid #ddd; margin-bottom: 10px; cursor: pointer;}
@@ -153,13 +158,11 @@
             <h2>
                 <span id="calendarViewTitle">📅 行事曆</span>
                 <div class="cal-controls">
-                    <!-- 視角切換器 -->
                     <div class="btn-group">
                         <button id="view-week" onclick="switchCalendarView('week')">單週</button>
                         <button id="view-biweek" class="active" onclick="switchCalendarView('biweek')">雙週</button>
                         <button id="view-month" onclick="switchCalendarView('month')">月分</button>
                     </div>
-                    <!-- 翻頁控制 -->
                     <div class="nav-btns">
                         <button onclick="navigateCalendar(-1)">◀ 上一個</button>
                         <button class="btn-today" onclick="resetToToday()">今天</button>
@@ -167,9 +170,7 @@
                     </div>
                 </div>
             </h2>
-            <div class="calendar-scroll-area" id="calendarRenderArea">
-                <!-- 動態網格渲染區 -->
-            </div>
+            <div class="calendar-scroll-area" id="calendarRenderArea"></div>
         </div>
 
         <div class="panel right-panel">
@@ -178,15 +179,21 @@
                 <button class="tab-btn" id="btnTabNotebook" onclick="switchTab('notebook')">📓 會議筆記本</button>
             </div>
 
+            <!-- 頁籤 1：智慧便利貼區域 -->
             <div id="tabSticky" class="tab-content active">
                 <div class="input-group">
-                    <textarea id="noteInput" placeholder="輸入隨手待辦..." style="height: 50px;"></textarea>
+                    <!-- 隱藏欄位用來記錄目前正在編輯哪一張便利貼 -->
+                    <input type="hidden" id="editingNoteId" value="">
+                    
+                    <textarea id="noteInput" placeholder="輸入隨手待辦事項...(點擊下方已建立的便利貼卡片可以直接進行修改)"></textarea>
                     <div class="note-options">
                         <label style="cursor:pointer; color: #d32f2f; font-weight:bold;"><input type="checkbox" id="urgentInput"> 🚨 標記為急件</label>
                     </div>
                     <label style="font-size: 12px; color: #555;">提醒時間：</label>
                     <input type="datetime-local" id="reminderInput">
-                    <button class="primary-btn" onclick="addNote()">新增便利貼</button>
+                    
+                    <button class="primary-btn" id="btnSaveNote" onclick="addOrUpdateNote()">新增便利貼</button>
+                    <button class="secondary-btn" id="btnCancelNoteEdit" onclick="clearNoteInput()" style="display: none;">取消編輯</button>
                 </div>
                 <div class="board-header">
                     <span style="font-weight: bold; color: #555;">進行中事項</span>
@@ -195,6 +202,7 @@
                 <div id="notesContainer"></div>
             </div>
 
+            <!-- 頁籤 2：會議筆記本區域 -->
             <div id="tabNotebook" class="tab-content">
                 <div id="notebookListView" style="display: flex; flex-direction: column; flex-grow: 1;">
                     <button class="primary-btn" style="margin-bottom: 15px;" onclick="openNoteEditor(-1)">+ 新增筆記</button>
@@ -275,8 +283,8 @@
             if(!t.startDate) t.startDate = t.date;
             if(!t.endDate) t.endDate = t.date;
         });
+        notes.forEach(n => { if(!n.id) n.id = 'note-' + Math.random() + Date.now(); });
 
-        // 星期顯示名稱定義
         const weekDays = ['週日', '週一', '週二', '週三', '週四', '週五', '週六'];
         let currentViewDate = new Date(); 
         let calendarViewMode = localStorage.getItem('calendarViewMode') || 'biweek';
@@ -349,7 +357,7 @@
             notes.forEach(note => {
                 if (note.text.toLowerCase().includes(query)) {
                     totalMatches++; let statusLabel = note.isDone ? '[已結案]' : '[進行中]';
-                    panel.innerHTML += `<div class="search-item"><span class="search-badge badge-note">📝 便利貼</span><strong>${statusLabel}</strong> ➜ ${note.text}</div>`;
+                    panel.innerHTML += `<div class="search-item click-action" onclick="openNoteModifyMode('${note.id}')"><span class="search-badge badge-note">📝 便利貼</span><strong>${statusLabel}</strong> ➜ ${note.text} (點擊編輯)</div>`;
                 }
             });
             meetingNotes.forEach((note, index) => {
@@ -626,29 +634,129 @@
             }
         }
 
-        // 便利貼管理
+        // ====== 📝 智慧便利貼管理核心 (整合修改功能) ======
         function renderNotes() {
             const container = document.getElementById('notesContainer'); const showDone = document.getElementById('showDoneInput').checked; container.innerHTML = '';
-            notes.forEach((note, index) => {
+            notes.forEach((note) => {
                 if (note.isDone && !showDone) return;
                 let noteDiv = document.createElement('div'); noteDiv.className = `note ${note.isUrgent ? 'urgent' : ''} ${note.isDone ? 'done' : ''}`;
                 let urgentBadge = note.isUrgent ? `<span style="background:#f44336; color:white; font-size:11px; padding:2px 6px; border-radius:3px; font-weight:bold; margin-left:5px;">🚨 急件</span>` : ``;
                 let reminderHTML = note.reminderTime ? `<span style="color:#d32f2f; font-weight:bold;">🔔 ${new Date(note.reminderTime).toLocaleString()}</span>` : `<span></span>`;
-                noteDiv.innerHTML = `<div class="note-header"><div><input type="checkbox" class="done-checkbox" ${note.isDone ? 'checked' : ''} onchange="toggleDone(${index}, this.checked)">${urgentBadge}</div><button class="delete-btn" onclick="deleteNote(${index})">🗑️</button></div><p class="note-text">${note.text}</p><div class="note-meta"><span>使用日期: ${note.usedDate}</span>${reminderHTML}</div>`;
+                
+                // 點選卡片任意處觸發編輯修改模式
+                noteDiv.onclick = () => openNoteModifyMode(note.id);
+
+                noteDiv.innerHTML = `
+                    <div class="note-header">
+                        <div>
+                            <input type="checkbox" class="done-checkbox" ${note.isDone ? 'checked' : ''} 
+                                onclick="event.stopPropagation(); toggleDoneById('${note.id}', this.checked)">
+                            ${urgentBadge}
+                        </div>
+                        <button class="delete-btn" onclick="event.stopPropagation(); deleteNoteById('${note.id}')">🗑️</button>
+                    </div>
+                    <p class="note-text">${note.text}</p>
+                    <div class="note-meta"><span>使用日期: ${note.usedDate}</span>${reminderHTML}</div>
+                `;
                 container.appendChild(noteDiv);
             });
         }
-        function addNote() {
-            let text = document.getElementById('noteInput').value; let reminder = document.getElementById('reminderInput').value; let isUrgent = document.getElementById('urgentInput').checked;
-            if (!text.trim()) { alert("請輸入便利貼內容！"); return; }
-            notes.unshift({ id: 'note-' + Date.now() + Math.random(), text: text, usedDate: new Date().toLocaleDateString('zh-TW'), reminderTime: reminder ? new Date(reminder).getTime() : null, isDismissed: false, isUrgent: isUrgent, isDone: false });
-            localStorage.setItem('myStickyNotes', JSON.stringify(notes)); document.getElementById('noteInput').value = ''; document.getElementById('reminderInput').value = ''; document.getElementById('urgentInput').checked = false; renderNotes();
+
+        // 啟動便利貼修改模式
+        function openNoteModifyMode(noteId) {
+            let note = notes.find(n => n.id === noteId);
+            if (!note) return;
+
+            document.getElementById('editingNoteId').value = note.id;
+            document.getElementById('noteInput').value = note.text;
+            document.getElementById('urgentInput').checked = note.isUrgent;
+            
+            if (note.reminderTime) {
+                // 將時間戳記轉回 datetime-local 輸入框能接受的 YYYY-MM-DDTHH:MM 格式
+                let d = new Date(note.reminderTime);
+                let tzOffset = d.getTimezoneOffset() * 60000; // 時區毫秒誤差
+                let localISOTime = (new Date(d.getTime() - tzOffset)).toISOString().slice(0, 16);
+                document.getElementById('reminderInput').value = localISOTime;
+            } else {
+                document.getElementById('reminderInput').value = '';
+            }
+
+            // 切換按鈕文字外觀
+            document.getElementById('btnSaveNote').innerText = '💾 儲存修改內容';
+            document.getElementById('btnSaveNote').style.background = '#2b6cb0';
+            document.getElementById('btnCancelNoteEdit').style.display = 'block';
+            
+            // 滾動讓輸入框置頂，方便手機端操作
+            document.getElementById('tabSticky').scrollTop = 0;
         }
-        function toggleDone(index, isChecked) { notes[index].isDone = isChecked; localStorage.setItem('myStickyNotes', JSON.stringify(notes)); renderNotes(); }
-        function deleteNote(index) {
+
+        // 取消並清空便利貼欄位
+        function clearNoteInput() {
+            document.getElementById('editingNoteId').value = '';
+            document.getElementById('noteInput').value = '';
+            document.getElementById('urgentInput').checked = false;
+            document.getElementById('reminderInput').value = '';
+            
+            document.getElementById('btnSaveNote').innerText = '新增便利貼';
+            document.getElementById('btnSaveNote').style.background = '#0066cc';
+            document.getElementById('btnCancelNoteEdit').style.display = 'none';
+        }
+
+        // 整合一體的「新增與修改」儲存入口
+        function addOrUpdateNote() {
+            let targetId = document.getElementById('editingNoteId').value;
+            let text = document.getElementById('noteInput').value; 
+            let reminder = document.getElementById('reminderInput').value; 
+            let isUrgent = document.getElementById('urgentInput').checked;
+            
+            if (!text.trim()) { alert("請輸入便利貼內容！"); return; }
+            
+            let reminderTime = reminder ? new Date(reminder).getTime() : null;
+            let dateStr = new Date().toLocaleDateString('zh-TW') + " " + new Date().toLocaleTimeString('zh-TW', {hour: '2-digit', minute:'2-digit'});
+
+            if (targetId) {
+                // 編輯模式
+                let noteIndex = notes.findIndex(n => n.id === targetId);
+                if (noteIndex !== -1) {
+                    notes[noteIndex].text = text;
+                    notes[noteIndex].reminderTime = reminderTime;
+                    notes[noteIndex].isUrgent = isUrgent;
+                    notes[noteIndex].usedDate = dateStr; // 儲存變更時自動打上最新時間戳記
+                    notes[noteIndex].isDismissed = false; // 重置通知阻斷
+                }
+            } else {
+                // 常規全新新增模式
+                notes.unshift({ 
+                    id: 'note-' + Date.now() + Math.random(), 
+                    text: text, 
+                    usedDate: dateStr, 
+                    reminderTime: reminderTime, 
+                    isDismissed: false, 
+                    isUrgent: isUrgent, 
+                    isDone: false 
+                });
+            }
+            
+            localStorage.setItem('myStickyNotes', JSON.stringify(notes)); 
+            clearNoteInput(); 
+            renderNotes();
+        }
+
+        function toggleDoneById(noteId, isChecked) { 
+            let note = notes.find(n => n.id === noteId);
+            if(note) note.isDone = isChecked;
+            localStorage.setItem('myStickyNotes', JSON.stringify(notes)); 
+            renderNotes(); 
+        }
+
+        function deleteNoteById(noteId) {
             if(confirm("確定永久刪除此便利貼嗎？")) {
-                let toastEl = document.getElementById(`toast-${notes[index].id}`); if (toastEl) toastEl.remove();
-                notes.splice(index, 1); localStorage.setItem('myStickyNotes', JSON.stringify(notes)); renderNotes();
+                let toastEl = document.getElementById(`toast-${noteId}`); if (toastEl) toastEl.remove();
+                notes = notes.filter(n => n.id !== noteId);
+                localStorage.setItem('myStickyNotes', JSON.stringify(notes)); 
+                // 如果刪除的剛好是正在編輯的項目，順便清空輸入框
+                if (document.getElementById('editingNoteId').value === noteId) clearNoteInput();
+                renderNotes();
             }
         }
 
@@ -688,9 +796,11 @@
                     reader.onloadend = function() { tempAudioBase64 = reader.result; createAudioPlayer(tempAudioBase64); document.getElementById('recordStatus').innerText = "🎙️ 錄音完成！(請記得點選儲存)"; }
                     stream.getTracks().forEach(track => track.stop());
                 };
-            }).catch(err => { alert("無法啟動麥克風，請確認權權限！"); });
+            }).catch(err => { alert("無法啟動麥克風，請確認權限！"); });
         }
         function stopRecording() { if(mediaRecorder && mediaRecorder.state === "recording") { mediaRecorder.stop(); document.getElementById('btnStartRecord').style.display = 'block'; document.getElementById('btnStopRecord').style.display = 'none'; } }
+
+        document.getElementById('btnStopRecord').style.display = 'none';
 
         function createAudioPlayer(base64Src) {
             const container = document.getElementById('audioPlayerContainer'); container.innerHTML = '';
