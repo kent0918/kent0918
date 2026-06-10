@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>智慧工作台 (跨日行事曆優化版)</title>
+    <title>智慧工作台 (多視角行事曆優化版)</title>
     <style>
         body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; display: flex; flex-direction: column; padding: 20px; background: #f0f2f5; margin: 0; height: 100vh; box-sizing: border-box; gap: 15px;}
         
@@ -30,28 +30,40 @@
         /* 主程式雙欄佈局 */
         .app-container { display: flex; flex-grow: 1; gap: 20px; overflow: hidden; width: 100%; height: calc(100% - 65px); }
         .panel { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); overflow-y: auto; height: 100%; box-sizing: border-box;}
-        .calendar-panel { width: 60%; }
+        .calendar-panel { width: 60%; display: flex; flex-direction: column; }
         .right-panel { width: 40%; background: #fafafa; display: flex; flex-direction: column; overflow: hidden;}
         
-        h2 { color: #333; border-bottom: 2px solid #e0e5ec; padding-bottom: 10px; margin-top: 0; display: flex; justify-content: space-between; align-items: center;}
+        h2 { color: #333; border-bottom: 2px solid #e0e5ec; padding-bottom: 10px; margin-top: 0; display: flex; justify-content: space-between; align-items: center; flex-shrink: 0;}
         
-        /* 行事曆翻頁控制 */
-        .cal-controls { display: flex; gap: 8px; font-size: 14px; }
-        .cal-controls button { background: #fff; border: 1px solid #ccc; padding: 5px 10px; border-radius: 5px; cursor: pointer; color: #333; }
-        .cal-controls button:hover { background: #e9ecef; }
-        .cal-controls button.btn-today { background: #e3f2fd; color: #0066cc; border-color: #0066cc; font-weight: bold;}
+        /* 行事曆翻頁與視角控制 */
+        .cal-controls { display: flex; gap: 15px; align-items: center; }
+        .btn-group { display: flex; border: 1px solid #cbd5e0; border-radius: 6px; overflow: hidden; }
+        .btn-group button { background: #fff; border: none; padding: 6px 12px; font-size: 13px; cursor: pointer; border-right: 1px solid #cbd5e0; }
+        .btn-group button:last-child { border-right: none; }
+        .btn-group button.active { background: #0066cc; color: white; font-weight: bold; }
+        .nav-btns { display: flex; gap: 5px; }
+        .nav-btns button { background: #fff; border: 1px solid #ccc; padding: 5px 10px; border-radius: 5px; cursor: pointer; color: #333; }
+        .nav-btns button:hover { background: #e9ecef; }
+        .nav-btns button.btn-today { background: #e3f2fd; color: #0066cc; border-color: #0066cc; font-weight: bold;}
 
-        /* 行事曆 14 天網格 */
+        /* 行事曆滾動區域 */
+        .calendar-scroll-area { flex-grow: 1; overflow-y: auto; padding-right: 5px; }
         .week-title { font-weight: bold; margin: 15px 0 5px 0; color: #555; }
+        .week-title:first-of-type { margin-top: 5px; }
+        
+        /* 行事曆網格 */
         .calendar-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 8px; margin-bottom: 15px;}
         .day-cell { border: 1px solid #e0e0e0; border-radius: 8px; min-height: 110px; display: flex; flex-direction: column; background: #fff; padding: 6px; box-sizing: border-box;}
         .day-header { text-align: center; font-size: 13px; font-weight: bold; padding-bottom: 4px; border-bottom: 1px solid #eee; margin-bottom: 6px; color: #666;}
         .day-header.today { background: #0066cc; color: white; border-radius: 4px; border: none; padding: 2px 0;}
         
-        /* 連續/一般行程樣式修正 */
-        .cal-task { background: #e3f2fd; border-left: 3px solid #0066cc; padding: 4px; font-size: 11px; border-radius: 3px; margin-bottom: 4px; position: relative; word-break: break-all;}
-        .cal-task.multi-day { background: #e6fffa; border-left: 3px solid #319795; color: #234e52; } /* 跨日行程改為質感綠 */
-        .cal-task .del-task { float: right; color: #999; cursor: pointer; border: none; background: none; font-size: 10px; padding: 0; margin-left: 4px;}
+        /* 行程樣式 */
+        .cal-task { background: #e3f2fd; border-left: 3px solid #0066cc; padding: 4px; font-size: 11px; border-radius: 3px; margin-bottom: 4px; position: relative; word-break: break-all; cursor: pointer; transition: background 0.2s;}
+        .cal-task:hover { background: #d0e7ff; }
+        .cal-task.multi-day { background: #e6fffa; border-left: 3px solid #319795; color: #234e52; }
+        .cal-task.multi-day:hover { background: #b2f5ea; }
+        .cal-task .del-task { float: right; color: #999; cursor: pointer; border: none; background: none; font-size: 10px; padding: 0; margin-left: 4px; font-weight: bold;}
+        .cal-task .del-task:hover { color: #e53e3e; }
         .cal-time { font-weight: bold; color: #d32f2f; display: block; }
         .add-task-btn { margin-top: auto; background: #f8f9fa; border: 1px dashed #ccc; cursor: pointer; padding: 4px; border-radius: 4px; color: #666; font-size: 11px; text-align: center;}
         .add-task-btn:hover { background: #e9ecef; }
@@ -116,6 +128,8 @@
             .calendar-grid { grid-template-columns: repeat(2, 1fr); } 
             .day-cell { min-height: 140px; }
             .notification-container { width: calc(100% - 40px); left: 20px; right: 20px; top: 10px; }
+            .cal-controls { flex-direction: column; align-items: stretch; gap: 8px;}
+            .btn-group, .nav-btns { justify-content: center; }
         }
     </style>
 </head>
@@ -137,17 +151,22 @@
     <div class="app-container">
         <div class="panel calendar-panel">
             <h2>
-                <span>📅 雙週行事曆</span>
+                <span id="calendarViewTitle">📅 行事曆</span>
                 <div class="cal-controls">
-                    <button onclick="changeWeek(-1)">◀ 上週</button>
-                    <button class="btn-today" onclick="resetToToday()">本週</button>
-                    <button onclick="changeWeek(1)">下週 ▶</button>
+                    <div class="btn-group">
+                        <button id="view-week" onclick="switchCalendarView('week')">單週</button>
+                        <button id="view-biweek" class="active" onclick="switchCalendarView('biweek')">雙週</button>
+                        <button id="view-month" onclick="switchCalendarView('month')">月分</button>
+                    </div>
+                    <div class="nav-btns">
+                        <button onclick="navigateCalendar(-1)">◀ 上一個</button>
+                        <button class="btn-today" onclick="resetToToday()">今天</button>
+                        <button onclick="navigateCalendar(1)">下一個 ▶</button>
+                    </div>
                 </div>
             </h2>
-            <div class="week-title" id="week1Title">▼ 第一週</div>
-            <div class="calendar-grid" id="week1Grid"></div>
-            <div class="week-title" id="week2Title">▼ 第二週</div>
-            <div class="calendar-grid" id="week2Grid"></div>
+            <div class="calendar-scroll-area" id="calendarRenderArea">
+                </div>
         </div>
 
         <div class="panel right-panel">
@@ -201,7 +220,9 @@
 
     <div class="modal-overlay" id="taskModal">
         <div class="modal">
-            <h3 style="margin:0;" id="modalDateTitle">新增行程</h3>
+            <h3 style="margin:0;" id="modalDateTitle">行程排程設定</h3>
+            <input type="hidden" id="editingTaskId" value="">
+            
             <div style="display: flex; gap: 10px; flex-direction: column;">
                 <label style="font-size: 13px; font-weight: bold; color: #555;">📅 日期範圍設定：</label>
                 <div style="display: flex; gap: 5px; align-items: center;">
@@ -248,15 +269,17 @@
         // 舊資料結構相容性修補
         calendarTasks.forEach(t => { 
             if(!t.id) t.id = 'task-' + Math.random() + Date.now(); 
-            if(!t.startDate) t.startDate = t.date; // 舊的單日行程相容
+            if(!t.startDate) t.startDate = t.date;
             if(!t.endDate) t.endDate = t.date;
         });
 
         const weekDays = ['日', '一', '二', '三', '四', '五', '六'];
         let currentViewDate = new Date(); 
+        let calendarViewMode = localStorage.getItem('calendarViewMode') || 'biweek'; // 預設雙週檢視
         let mediaRecorder; let audioChunks = []; let tempAudioBase64 = null;
         const nationalHolidays = ['2026-01-01', '2026-02-28', '2026-04-03', '2026-04-04', '2026-05-01', '2026-10-10'];
         let activeToasts = {};
+        let currentEditingNoteIndex = -1;
 
         function exportAllData() {
             let dataBundle = { calendarTasks: calendarTasks, notes: notes, meetingNotes: meetingNotes };
@@ -316,7 +339,7 @@
                 if (task.title.toLowerCase().includes(query)) {
                     totalMatches++; 
                     let dateDisplay = task.startDate === task.endDate ? task.startDate : `${task.startDate} ~ ${task.endDate}`;
-                    panel.innerHTML += `<div class="search-item"><span class="search-badge badge-cal">📅 行事曆</span><strong>${dateDisplay}</strong> ➜ ${task.title}</div>`;
+                    panel.innerHTML += `<div class="search-item click-action" onclick="openModifyModal('${task.id}')"><span class="search-badge badge-cal">📅 行事曆</span><strong>${dateDisplay}</strong> ➜ ${task.title} (點擊編輯)</div>`;
                 }
             });
             notes.forEach(note => {
@@ -342,60 +365,182 @@
             else { document.getElementById('btnTabNotebook').classList.add('active'); document.getElementById('tabNotebook').classList.add('active'); renderMeetingNotes(); }
         }
 
-        // 行事曆重構：支援跨日行程精準著色
+        /* 視角切換控制邏輯 */
+        function switchCalendarView(mode) {
+            calendarViewMode = mode;
+            localStorage.setItem('calendarViewMode', mode);
+            document.querySelectorAll('.btn-group button').forEach(b => b.classList.remove('active'));
+            document.getElementById(`view-${mode}`).classList.add('active');
+            renderCalendar();
+        }
+
+        /* 翻頁控制邏輯 */
+        function navigateCalendar(direction) {
+            if (calendarViewMode === 'week') {
+                currentViewDate.setDate(currentViewDate.getDate() + (direction * 7));
+            } else if (calendarViewMode === 'biweek') {
+                currentViewDate.setDate(currentViewDate.getDate() + (direction * 14));
+            } else if (calendarViewMode === 'month') {
+                currentViewDate.setMonth(currentViewDate.getMonth() + direction);
+            }
+            renderCalendar();
+        }
+
+        function resetToToday() { currentViewDate = new Date(); renderCalendar(); }
+
+        /* 行事曆核心渲染引擎 */
         function renderCalendar() {
-            const week1Container = document.getElementById('week1Grid'); const week2Container = document.getElementById('week2Grid');
-            week1Container.innerHTML = ''; week2Container.innerHTML = '';
-            let tempDate = new Date(currentViewDate); let dayOfWeek = tempDate.getDay();
-            let diffToMonday = tempDate.getDate() - dayOfWeek + (dayOfWeek === 0 ? -6 : 1); 
-            let startOfViewWeek = new Date(tempDate.setDate(diffToMonday));
-            document.getElementById('week1Title').innerText = `▼ ${startOfViewWeek.getMonth() + 1}月 第一週`;
+            const area = document.getElementById('calendarRenderArea');
+            area.innerHTML = '';
             let realToday = new Date().toDateString();
 
-            // 1. 先把 14 天的網格做出來
-            for (let i = 0; i < 14; i++) {
-                let d = new Date(startOfViewWeek); d.setDate(d.getDate() + i);
-                if (i === 7) document.getElementById('week2Title').innerText = `▼ ${d.getMonth() + 1}月 第二週`;
-                let dateStr = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+            if (calendarViewMode === 'week' || calendarViewMode === 'biweek') {
+                // 週與雙週結構渲染
+                let totalDays = calendarViewMode === 'week' ? 7 : 14;
+                let tempDate = new Date(currentViewDate);
+                let dayOfWeek = tempDate.getDay();
+                let diffToMonday = tempDate.getDate() - dayOfWeek + (dayOfWeek === 0 ? -6 : 1); // 以週一為起始
+                let startOfViewWeek = new Date(tempDate.setDate(diffToMonday));
                 
-                let isMobile = window.innerWidth <= 1024;
-                let displayDate = isMobile ? `${d.getMonth()+1}/${d.getDate()}` : `${d.getMonth()+1}/${d.getDate()} (${weekDays[d.getDay()]})`;
-                
-                let isToday = (realToday === d.toDateString());
-                let isWeekend = (d.getDay() === 0 || d.getDay() === 6);
-                let isHoliday = nationalHolidays.includes(dateStr);
+                document.getElementById('calendarViewTitle').innerText = `📅 行事曆 (${calendarViewMode === 'week' ? '單週' : '雙週'}檢視)`;
 
-                let cell = document.createElement('div'); cell.className = 'day-cell';
-                if (isWeekend || isHoliday) { cell.style.backgroundColor = '#fff0f2'; } 
+                // 產生格線與標題
+                let weeksCount = totalDays / 7;
+                for (let w = 0; w < weeksCount; w++) {
+                    let wStart = new Date(startOfViewWeek);
+                    wStart.setDate(wStart.getDate() + (w * 7));
+                    
+                    let titleDiv = document.createElement('div');
+                    titleDiv.className = 'week-title';
+                    titleDiv.innerText = `▼ ${wStart.getMonth() + 1}月 第 ${w + 1} 週`;
+                    area.appendChild(titleDiv);
 
-                cell.innerHTML = `<div class="day-header ${isToday ? 'today' : ''}">${displayDate}</div><div class="task-list" id="tasks-${dateStr}" style="flex-grow:1; overflow:hidden;"></div><div class="add-task-btn" onclick="openModal('${dateStr}')">+ 新增</div>`;
-                if (i < 7) week1Container.appendChild(cell); else week2Container.appendChild(cell);
+                    let gridDiv = document.createElement('div');
+                    gridDiv.className = 'calendar-grid';
+                    
+                    for (let dIdx = 0; dIdx < 7; dIdx++) {
+                        let currentDay = new Date(wStart);
+                        currentDay.setDate(currentDay.getDate() + dIdx);
+                        let dateStr = `${currentDay.getFullYear()}-${String(currentDay.getMonth()+1).padStart(2,'0')}-${String(currentDay.getDate()).padStart(2,'0')}`;
+                        
+                        let isMobile = window.innerWidth <= 1024;
+                        let displayDate = isMobile ? `${currentDay.getMonth()+1}/${currentDay.getDate()}` : `${currentDay.getMonth()+1}/${currentDay.getDate()} (${weekDays[currentDay.getDay()]})`;
+                        
+                        let isToday = (realToday === currentDay.toDateString());
+                        let isWeekend = (currentDay.getDay() === 0 || currentDay.getDay() === 6);
+                        let isHoliday = nationalHolidays.includes(dateStr);
+
+                        let cell = document.createElement('div');
+                        cell.className = 'day-cell';
+                        if (isWeekend || isHoliday) { cell.style.backgroundColor = '#fff0f2'; } 
+
+                        cell.innerHTML = `
+                            <div class="day-header ${isToday ? 'today' : ''}">${displayDate}</div>
+                            <div class="task-list" id="tasks-${dateStr}" style="flex-grow:1; overflow:hidden;"></div>
+                            <div class="add-task-btn" onclick="openModal('${dateStr}')">+ 新增</div>
+                        `;
+                        gridDiv.appendChild(cell);
+                    }
+                    area.appendChild(gridDiv);
+                }
+
+                // 填入排程
+                injectTasksIntoGrid(startOfViewWeek, totalDays);
+
+            } else if (calendarViewMode === 'month') {
+                // 月分結構渲染
+                let year = currentViewDate.getFullYear();
+                let month = currentViewDate.getMonth();
+                document.getElementById('calendarViewTitle').innerText = `📅 行事曆 (${year}年 ${month + 1}月)`;
+
+                let firstDayOfMonth = new Date(year, month, 1);
+                let startDayOfWeek = firstDayOfMonth.getDay(); // 該月第一天是星期幾
+                if (startDayOfWeek === 0) startDayOfWeek = 7; // 轉為週一為起點的計算
+
+                let startGridDate = new Date(firstDayOfMonth);
+                startGridDate.setDate(startGridDate.getDate() - (startDayOfWeek - 1)); // 網格的最左上角那天
+
+                // 固定畫 6 週 (42天) 確保各種月分都能完整顯示
+                let titleDiv = document.createElement('div');
+                titleDiv.className = 'week-title';
+                titleDiv.innerText = `▼ 當月完整檢視`;
+                area.appendChild(titleDiv);
+
+                let gridDiv = document.createElement('div');
+                gridDiv.className = 'calendar-grid';
+                gridDiv.style.gridTemplateRows = 'repeat(6, 1fr)';
+
+                for (let i = 0; i < 42; i++) {
+                    let currentDay = new Date(startGridDate);
+                    currentDay.setDate(currentDay.getDate() + i);
+                    let dateStr = `${currentDay.getFullYear()}-${String(currentDay.getMonth()+1).padStart(2,'0')}-${String(currentDay.getDate()).padStart(2,'0')}`;
+
+                    let isToday = (realToday === currentDay.toDateString());
+                    let isWeekend = (currentDay.getDay() === 0 || currentDay.getDay() === 6);
+                    let isHoliday = nationalHolidays.includes(dateStr);
+                    let isCurrentMonth = currentDay.getMonth() === month;
+
+                    let cell = document.createElement('div');
+                    cell.className = 'day-cell';
+                    if (!isCurrentMonth) {
+                        cell.style.opacity = '0.4';
+                        cell.style.background = '#f7fafc';
+                    } else if (isWeekend || isHoliday) {
+                        cell.style.backgroundColor = '#fff0f2';
+                    }
+
+                    cell.innerHTML = `
+                        <div class="day-header ${isToday ? 'today' : ''}">${currentDay.getMonth()+1}/${currentDay.getDate()}</div>
+                        <div class="task-list" id="tasks-${dateStr}" style="flex-grow:1; overflow:hidden;"></div>
+                        <div class="add-task-btn" onclick="openModal('${dateStr}')">+ 新增</div>
+                    `;
+                    gridDiv.appendChild(cell);
+                }
+                area.appendChild(gridDiv);
+
+                injectTasksIntoGrid(startGridDate, 42);
             }
-            
-            // 2. 判斷並塞入行程 (支援跨日行程在複數日期內的顯示)
-            calendarTasks.forEach((task, index) => {
+        }
+
+        /* 輔助方法：將排程塞入對應日期的 DOM 容器中 */
+        function injectTasksIntoGrid(startDateObj, totalDaysSpan) {
+            calendarTasks.forEach((task) => {
                 let startTS = new Date(task.startDate + 'T00:00:00').getTime();
                 let endTS = new Date(task.endDate + 'T00:00:00').getTime();
                 let isMultiDay = task.startDate !== task.endDate;
 
-                // 巡檢畫面上展示的 14 天
-                for(let i=0; i<14; i++) {
-                    let d = new Date(startOfViewWeek); d.setDate(d.getDate() + i);
+                for (let i = 0; i < totalDaysSpan; i++) {
+                    let d = new Date(startDateObj);
+                    d.setDate(d.getDate() + i);
                     let dateStr = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
                     let currentCellTS = new Date(dateStr + 'T00:00:00').getTime();
 
-                    // 如果這一天落在行程的「開始」與「結束」日期之間，就把它渲染出來
-                    if(currentCellTS >= startTS && currentCellTS <= endTS) {
+                    if (currentCellTS >= startTS && currentCellTS <= endTS) {
                         let taskContainer = document.getElementById(`tasks-${dateStr}`);
                         if (taskContainer) {
                             let tDiv = document.createElement('div'); 
                             tDiv.className = `cal-task ${isMultiDay ? 'multi-day' : ''}`;
                             
+                            // 點擊整條行程觸發修改
+                            tDiv.onclick = (e) => {
+                                e.stopPropagation(); // 阻止觸發外層新增按鈕
+                                openModifyModal(task.id);
+                            };
+                            
                             let timeHTML = task.time ? `<span class="cal-time">⏰ ${task.time}</span>` : '';
-                            // 跨日標籤小後綴
                             let multiSuffix = isMultiDay ? ` <span style="opacity:0.6;font-size:9px;">(連)</span>` : '';
 
-                            tDiv.innerHTML = `<button class="del-task" onclick="deleteTask(${index})">✖</button>${timeHTML}${task.title}${multiSuffix}`;
+                            // 獨立的刪除按鈕
+                            let delBtn = document.createElement('button');
+                            delBtn.className = 'del-task';
+                            delBtn.innerText = '✖';
+                            delBtn.onclick = (e) => {
+                                e.stopPropagation(); // 阻止觸發修改彈窗
+                                deleteTaskById(task.id);
+                            };
+
+                            tDiv.innerHTML = `${timeHTML}${task.title}${multiSuffix}`;
+                            tDiv.prepend(delBtn);
                             taskContainer.appendChild(tDiv);
                         }
                     }
@@ -403,22 +548,51 @@
             });
         }
         
-        function changeWeek(offset) { currentViewDate.setDate(currentViewDate.getDate() + (offset * 7)); renderCalendar(); }
-        function resetToToday() { currentViewDate = new Date(); renderCalendar(); }
-        
+        /* 彈出視窗：新增模式 */
         function openModal(dateStr) {
+            document.getElementById('editingTaskId').value = ''; // 清空代表新增
             document.getElementById('taskStartDate').value = dateStr; 
             document.getElementById('taskEndDate').value = dateStr; 
-            document.getElementById('modalDateTitle').innerText = `新增行程排程`;
+            document.getElementById('modalDateTitle').innerText = `📅 新增行程排程`;
             document.getElementById('taskTitle').value = ''; 
             document.getElementById('taskTime').value = '';
             document.getElementById('taskReminderOffset').value = '0'; 
             document.getElementById('taskReminderTime').value = '';
             document.getElementById('taskModal').style.display = 'flex';
         }
+
+        /* 彈出視窗：修改模式 */
+        function openModifyModal(taskId) {
+            let task = calendarTasks.find(t => t.id === taskId);
+            if (!task) return;
+
+            document.getElementById('editingTaskId').value = task.id; // 設定正在修改的 ID
+            document.getElementById('taskStartDate').value = task.startDate; 
+            document.getElementById('taskEndDate').value = task.endDate; 
+            document.getElementById('modalDateTitle').innerText = `✏️ 修改行程排程`;
+            document.getElementById('taskTitle').value = task.title; 
+            document.getElementById('taskTime').value = task.time || '';
+            
+            // 反推提醒設定
+            if (task.reminderTimestamp) {
+                let rDate = new Date(task.reminderTimestamp);
+                let sDate = new Date(task.startDate + 'T00:00:00');
+                let diffDays = Math.round((sDate - rDate) / (1000 * 60 * 60 * 24));
+                document.getElementById('taskReminderOffset').value = diffDays >= 0 ? diffDays : 0;
+                document.getElementById('taskReminderTime').value = `${String(rDate.getHours()).padStart(2,'0')}:${String(rDate.getMinutes()).padStart(2,'0')}`;
+            } else {
+                document.getElementById('taskReminderOffset').value = '0'; 
+                document.getElementById('taskReminderTime').value = '';
+            }
+
+            document.getElementById('taskModal').style.display = 'flex';
+        }
+
         function closeModal() { document.getElementById('taskModal').style.display = 'none'; }
         
+        /* 儲存排程 (整合了新增與修改) */
         function saveTask() {
+            let targetId = document.getElementById('editingTaskId').value;
             let startDate = document.getElementById('taskStartDate').value;
             let endDate = document.getElementById('taskEndDate').value;
             let title = document.getElementById('taskTitle').value; 
@@ -432,30 +606,47 @@
             
             let reminderTimestamp = null;
             if (reminderTime) {
-                // 以第一天作為提醒的基準點
-                let targetDate = new Date(startDate + 'T00:00:00'); targetDate.setDate(targetDate.getDate() - offset);
+                let targetDate = new Date(startDate + 'T00:00:00'); 
+                targetDate.setDate(targetDate.getDate() - offset);
                 reminderTimestamp = new Date(`${targetDate.getFullYear()}-${String(targetDate.getMonth()+1).padStart(2,'0')}-${String(targetDate.getDate()).padStart(2,'0')}T${reminderTime}`).getTime();
             }
             
-            calendarTasks.push({ 
-                id: 'task-' + Date.now() + Math.random(), 
-                startDate: startDate,
-                endDate: endDate,
-                title: title, 
-                time: time, 
-                reminderTimestamp: reminderTimestamp, 
-                isDismissed: false 
-            });
+            if (targetId) {
+                // 修改現有排程
+                let taskIndex = calendarTasks.findIndex(t => t.id === targetId);
+                if (taskIndex !== -1) {
+                    calendarTasks[taskIndex].startDate = startDate;
+                    calendarTasks[taskIndex].endDate = endDate;
+                    calendarTasks[taskIndex].title = title;
+                    calendarTasks[taskIndex].time = time;
+                    calendarTasks[taskIndex].reminderTimestamp = reminderTimestamp;
+                    calendarTasks[taskIndex].isDismissed = false; // 重置通知阻斷
+                }
+            } else {
+                // 新增排程
+                calendarTasks.push({ 
+                    id: 'task-' + Date.now() + Math.random(), 
+                    startDate: startDate,
+                    endDate: endDate,
+                    title: title, 
+                    time: time, 
+                    reminderTimestamp: reminderTimestamp, 
+                    isDismissed: false 
+                });
+            }
             
             localStorage.setItem('myCalendarTasks', JSON.stringify(calendarTasks)); 
             closeModal(); 
             renderCalendar();
         }
         
-        function deleteTask(index) {
+        /* 依據 ID 進行刪除 */
+        function deleteTaskById(taskId) {
             if(confirm("確定刪除此排程嗎？(這會移除這段連續日期內的所有此標籤)")) {
-                let toastEl = document.getElementById(`toast-${calendarTasks[index].id}`); if (toastEl) toastEl.remove();
-                calendarTasks.splice(index, 1); localStorage.setItem('myCalendarTasks', JSON.stringify(calendarTasks)); renderCalendar();
+                let toastEl = document.getElementById(`toast-${taskId}`); if (toastEl) toastEl.remove();
+                calendarTasks = calendarTasks.filter(t => t.id !== taskId);
+                localStorage.setItem('myCalendarTasks', JSON.stringify(calendarTasks)); 
+                renderCalendar();
             }
         }
 
@@ -538,31 +729,4 @@
         }
 
         function saveMeetingNote() {
-            let title = document.getElementById('nbTitleInput').value || '未命名筆記'; let content = document.getElementById('nbContentInput').value; let dateStr = new Date().toLocaleString('zh-TW');
-            if (currentEditingNoteIndex === -1) { meetingNotes.unshift({ title: title, content: content, date: dateStr, audio: tempAudioBase64 }); } 
-            else { meetingNotes[currentEditingNoteIndex].title = title; meetingNotes[currentEditingNoteIndex].content = content; meetingNotes[currentEditingNoteIndex].date = dateStr; meetingNotes[currentEditingNoteIndex].audio = tempAudioBase64; }
-            localStorage.setItem('myMeetingNotes', JSON.stringify(meetingNotes)); closeNoteEditor(); renderMeetingNotes();
-        }
-        function deleteMeetingNote(index) { if(confirm("確定刪除此會議筆記嗎？")) { meetingNotes.splice(index, 1); localStorage.setItem('myMeetingNotes', JSON.stringify(meetingNotes)); renderMeetingNotes(); } }
-
-        function checkAndTriggerReminders() {
-            let nowTime = new Date().getTime();
-            calendarTasks.forEach((task) => {
-                if (task.reminderTimestamp && !task.isDismissed && nowTime >= task.reminderTimestamp) {
-                    showNotificationToast(task.id, 'cal', `行程預警通知 (主行程日: ${task.startDate})`, task.title);
-                }
-            });
-            notes.forEach((note) => {
-                if (!note.isDone && note.reminderTime && !note.isDismissed && nowTime >= note.reminderTime) {
-                    showNotificationToast(note.id, 'note', `智慧便利貼時效提醒`, note.text);
-                }
-            });
-        }
-
-        window.addEventListener('resize', renderCalendar);
-        setInterval(checkAndTriggerReminders, 10000);
-        
-        renderCalendar(); renderNotes(); checkAndTriggerReminders(); 
-    </script>
-</body>
-</html>
+            let title = document.getElementById
