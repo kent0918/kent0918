@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>智慧工作台 (多視角行事曆修正版)</title>
+    <title>智慧工作台 (多視角行事曆完美修正版)</title>
     <style>
         body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; display: flex; flex-direction: column; padding: 20px; background: #f0f2f5; margin: 0; height: 100vh; box-sizing: border-box; gap: 15px;}
         
@@ -153,11 +153,13 @@
             <h2>
                 <span id="calendarViewTitle">📅 行事曆</span>
                 <div class="cal-controls">
+                    <!-- 視角切換器 -->
                     <div class="btn-group">
                         <button id="view-week" onclick="switchCalendarView('week')">單週</button>
                         <button id="view-biweek" class="active" onclick="switchCalendarView('biweek')">雙週</button>
                         <button id="view-month" onclick="switchCalendarView('month')">月分</button>
                     </div>
+                    <!-- 翻頁控制 -->
                     <div class="nav-btns">
                         <button onclick="navigateCalendar(-1)">◀ 上一個</button>
                         <button class="btn-today" onclick="resetToToday()">今天</button>
@@ -166,7 +168,8 @@
                 </div>
             </h2>
             <div class="calendar-scroll-area" id="calendarRenderArea">
-                </div>
+                <!-- 動態網格渲染區 -->
+            </div>
         </div>
 
         <div class="panel right-panel">
@@ -218,6 +221,7 @@
         </div>
     </div>
 
+    <!-- 行程設定視窗 -->
     <div class="modal-overlay" id="taskModal">
         <div class="modal">
             <h3 style="margin:0;" id="modalDateTitle">行程排程設定</h3>
@@ -418,7 +422,6 @@
                         currentDay.setDate(currentDay.getDate() + dIdx);
                         let dateStr = `${currentDay.getFullYear()}-${String(currentDay.getMonth()+1).padStart(2,'0')}-${String(currentDay.getDate()).padStart(2,'0')}`;
                         
-                        // 修正：將星期幾加入格子標題中
                         let displayDate = `${currentDay.getMonth()+1}/${currentDay.getDate()} (${weekDays[currentDay.getDay()]})`;
                         
                         let isToday = (realToday === currentDay.toDateString());
@@ -465,7 +468,6 @@
                     currentDay.setDate(currentDay.getDate() + i);
                     let dateStr = `${currentDay.getFullYear()}-${String(currentDay.getMonth()+1).padStart(2,'0')}-${String(currentDay.getDate()).padStart(2,'0')}`;
 
-                    // 修正：月份檢視也同步加上星期幾
                     let displayDate = `${currentDay.getMonth()+1}/${currentDay.getDate()} (${weekDays[currentDay.getDay()]})`;
 
                     let isToday = (realToday === currentDay.toDateString());
@@ -686,11 +688,49 @@
                     reader.onloadend = function() { tempAudioBase64 = reader.result; createAudioPlayer(tempAudioBase64); document.getElementById('recordStatus').innerText = "🎙️ 錄音完成！(請記得點選儲存)"; }
                     stream.getTracks().forEach(track => track.stop());
                 };
-            }).catch(err => { alert("無法啟動麥克風，請確認權限！"); });
+            }).catch(err => { alert("無法啟動麥克風，請確認權權限！"); });
         }
-        function stopRecording() { if(mediaRecorder && mediaRecorder.state === "recording") { mediaRecorder.stop(); document.getElementById('btnStartRecord').style.display = 'block'; document.getElementById('btnStopRecord').style.none; } }
+        function stopRecording() { if(mediaRecorder && mediaRecorder.state === "recording") { mediaRecorder.stop(); document.getElementById('btnStartRecord').style.display = 'block'; document.getElementById('btnStopRecord').style.display = 'none'; } }
 
         function createAudioPlayer(base64Src) {
             const container = document.getElementById('audioPlayerContainer'); container.innerHTML = '';
             let audio = document.createElement('audio'); audio.controls = true; audio.src = base64Src;
-            let downloadBtn = document.createElement('button'); downloadBtn.className = 'btn-outline'; downloadBtn.style.cssText = "margin-top:5px; font-size:12px; padding:6px; width:100%; color:#2b6cb0; background:#ebf8ff; border
+            let downloadBtn = document.createElement('button'); downloadBtn.className = 'btn-outline'; downloadBtn.style.cssText = "margin-top:5px; font-size:12px; padding:6px; width:100%; color:#2b6cb0; background:#ebf8ff; border-color:#bee3f8;";
+            downloadBtn.innerText = "📥 下載音檔至電腦硬碟";
+            downloadBtn.onclick = (e) => {
+                e.preventDefault(); let a = document.createElement('a'); a.href = base64Src;
+                a.download = `${document.getElementById('nbTitleInput').value || '語音備忘'}.webm`; a.click();
+            };
+            container.appendChild(audio); container.appendChild(downloadBtn);
+        }
+
+        function saveMeetingNote() {
+            let title = document.getElementById('nbTitleInput').value || '未命名筆記'; let content = document.getElementById('nbContentInput').value; let dateStr = new Date().toLocaleString('zh-TW');
+            if (currentEditingNoteIndex === -1) { meetingNotes.unshift({ title: title, content: content, date: dateStr, audio: tempAudioBase64 }); } 
+            else { meetingNotes[currentEditingNoteIndex].title = title; meetingNotes[currentEditingNoteIndex].content = content; meetingNotes[currentEditingNoteIndex].date = dateStr; meetingNotes[currentEditingNoteIndex].audio = tempAudioBase64; }
+            localStorage.setItem('myMeetingNotes', JSON.stringify(meetingNotes)); closeNoteEditor(); renderMeetingNotes();
+        }
+        function deleteMeetingNote(index) { if(confirm("確定刪除此會議筆記嗎？")) { meetingNotes.splice(index, 1); localStorage.setItem('myMeetingNotes', JSON.stringify(meetingNotes)); renderMeetingNotes(); } }
+
+        function checkAndTriggerReminders() {
+            let nowTime = new Date().getTime();
+            calendarTasks.forEach((task) => {
+                if (task.reminderTimestamp && !task.isDismissed && nowTime >= task.reminderTimestamp) {
+                    showNotificationToast(task.id, 'cal', `行程預警通知 (主行程日: ${task.startDate})`, task.title);
+                }
+            });
+            notes.forEach((note) => {
+                if (!note.isDone && note.reminderTime && !note.isDismissed && nowTime >= note.reminderTime) {
+                    showNotificationToast(note.id, 'note', `智慧便利貼時效提醒`, note.text);
+                }
+            });
+        }
+
+        window.addEventListener('resize', renderCalendar);
+        setInterval(checkAndTriggerReminders, 10000);
+        
+        // 初始啟動
+        switchCalendarView(calendarViewMode); renderNotes(); checkAndTriggerReminders(); 
+    </script>
+</body>
+</html>
