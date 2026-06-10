@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>智慧工作台 (多視角行事曆優化版)</title>
+    <title>智慧工作台 (多視角行事曆修正版)</title>
     <style>
         body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; display: flex; flex-direction: column; padding: 20px; background: #f0f2f5; margin: 0; height: 100vh; box-sizing: border-box; gap: 15px;}
         
@@ -153,11 +153,13 @@
             <h2>
                 <span id="calendarViewTitle">📅 行事曆</span>
                 <div class="cal-controls">
+                    <!-- 視角切換器 -->
                     <div class="btn-group">
                         <button id="view-week" onclick="switchCalendarView('week')">單週</button>
                         <button id="view-biweek" class="active" onclick="switchCalendarView('biweek')">雙週</button>
                         <button id="view-month" onclick="switchCalendarView('month')">月分</button>
                     </div>
+                    <!-- 翻頁控制 -->
                     <div class="nav-btns">
                         <button onclick="navigateCalendar(-1)">◀ 上一個</button>
                         <button class="btn-today" onclick="resetToToday()">今天</button>
@@ -166,7 +168,8 @@
                 </div>
             </h2>
             <div class="calendar-scroll-area" id="calendarRenderArea">
-                </div>
+                <!-- 動態網格渲染區 -->
+            </div>
         </div>
 
         <div class="panel right-panel">
@@ -218,6 +221,7 @@
         </div>
     </div>
 
+    <!-- 行程設定視窗 -->
     <div class="modal-overlay" id="taskModal">
         <div class="modal">
             <h3 style="margin:0;" id="modalDateTitle">行程排程設定</h3>
@@ -266,7 +270,6 @@
         let notes = JSON.parse(localStorage.getItem('myStickyNotes')) || [];
         let meetingNotes = JSON.parse(localStorage.getItem('myMeetingNotes')) || [];
         
-        // 舊資料結構相容性修補
         calendarTasks.forEach(t => { 
             if(!t.id) t.id = 'task-' + Math.random() + Date.now(); 
             if(!t.startDate) t.startDate = t.date;
@@ -275,7 +278,7 @@
 
         const weekDays = ['日', '一', '二', '三', '四', '五', '六'];
         let currentViewDate = new Date(); 
-        let calendarViewMode = localStorage.getItem('calendarViewMode') || 'biweek'; // 預設雙週檢視
+        let calendarViewMode = localStorage.getItem('calendarViewMode') || 'biweek';
         let mediaRecorder; let audioChunks = []; let tempAudioBase64 = null;
         const nationalHolidays = ['2026-01-01', '2026-02-28', '2026-04-03', '2026-04-04', '2026-05-01', '2026-10-10'];
         let activeToasts = {};
@@ -365,7 +368,6 @@
             else { document.getElementById('btnTabNotebook').classList.add('active'); document.getElementById('tabNotebook').classList.add('active'); renderMeetingNotes(); }
         }
 
-        /* 視角切換控制邏輯 */
         function switchCalendarView(mode) {
             calendarViewMode = mode;
             localStorage.setItem('calendarViewMode', mode);
@@ -374,7 +376,6 @@
             renderCalendar();
         }
 
-        /* 翻頁控制邏輯 */
         function navigateCalendar(direction) {
             if (calendarViewMode === 'week') {
                 currentViewDate.setDate(currentViewDate.getDate() + (direction * 7));
@@ -388,23 +389,21 @@
 
         function resetToToday() { currentViewDate = new Date(); renderCalendar(); }
 
-        /* 行事曆核心渲染引擎 */
+        /* 行事曆渲染修正核心 */
         function renderCalendar() {
             const area = document.getElementById('calendarRenderArea');
             area.innerHTML = '';
             let realToday = new Date().toDateString();
 
             if (calendarViewMode === 'week' || calendarViewMode === 'biweek') {
-                // 週與雙週結構渲染
                 let totalDays = calendarViewMode === 'week' ? 7 : 14;
                 let tempDate = new Date(currentViewDate);
                 let dayOfWeek = tempDate.getDay();
-                let diffToMonday = tempDate.getDate() - dayOfWeek + (dayOfWeek === 0 ? -6 : 1); // 以週一為起始
+                let diffToMonday = tempDate.getDate() - dayOfWeek + (dayOfWeek === 0 ? -6 : 1); 
                 let startOfViewWeek = new Date(tempDate.setDate(diffToMonday));
                 
                 document.getElementById('calendarViewTitle').innerText = `📅 行事曆 (${calendarViewMode === 'week' ? '單週' : '雙週'}檢視)`;
 
-                // 產生格線與標題
                 let weeksCount = totalDays / 7;
                 for (let w = 0; w < weeksCount; w++) {
                     let wStart = new Date(startOfViewWeek);
@@ -443,24 +442,20 @@
                     }
                     area.appendChild(gridDiv);
                 }
-
-                // 填入排程
                 injectTasksIntoGrid(startOfViewWeek, totalDays);
 
             } else if (calendarViewMode === 'month') {
-                // 月分結構渲染
                 let year = currentViewDate.getFullYear();
                 let month = currentViewDate.getMonth();
                 document.getElementById('calendarViewTitle').innerText = `📅 行事曆 (${year}年 ${month + 1}月)`;
 
                 let firstDayOfMonth = new Date(year, month, 1);
-                let startDayOfWeek = firstDayOfMonth.getDay(); // 該月第一天是星期幾
-                if (startDayOfWeek === 0) startDayOfWeek = 7; // 轉為週一為起點的計算
+                let startDayOfWeek = firstDayOfMonth.getDay(); 
+                if (startDayOfWeek === 0) startDayOfWeek = 7; 
 
                 let startGridDate = new Date(firstDayOfMonth);
-                startGridDate.setDate(startGridDate.getDate() - (startDayOfWeek - 1)); // 網格的最左上角那天
+                startGridDate.setDate(startGridDate.getDate() - (startDayOfWeek - 1)); 
 
-                // 固定畫 6 週 (42天) 確保各種月分都能完整顯示
                 let titleDiv = document.createElement('div');
                 titleDiv.className = 'week-title';
                 titleDiv.innerText = `▼ 當月完整檢視`;
@@ -468,7 +463,6 @@
 
                 let gridDiv = document.createElement('div');
                 gridDiv.className = 'calendar-grid';
-                gridDiv.style.gridTemplateRows = 'repeat(6, 1fr)';
 
                 for (let i = 0; i < 42; i++) {
                     let currentDay = new Date(startGridDate);
@@ -497,12 +491,10 @@
                     gridDiv.appendChild(cell);
                 }
                 area.appendChild(gridDiv);
-
                 injectTasksIntoGrid(startGridDate, 42);
             }
         }
 
-        /* 輔助方法：將排程塞入對應日期的 DOM 容器中 */
         function injectTasksIntoGrid(startDateObj, totalDaysSpan) {
             calendarTasks.forEach((task) => {
                 let startTS = new Date(task.startDate + 'T00:00:00').getTime();
@@ -520,24 +512,15 @@
                         if (taskContainer) {
                             let tDiv = document.createElement('div'); 
                             tDiv.className = `cal-task ${isMultiDay ? 'multi-day' : ''}`;
-                            
-                            // 點擊整條行程觸發修改
-                            tDiv.onclick = (e) => {
-                                e.stopPropagation(); // 阻止觸發外層新增按鈕
-                                openModifyModal(task.id);
-                            };
+                            tDiv.onclick = (e) => { e.stopPropagation(); openModifyModal(task.id); };
                             
                             let timeHTML = task.time ? `<span class="cal-time">⏰ ${task.time}</span>` : '';
                             let multiSuffix = isMultiDay ? ` <span style="opacity:0.6;font-size:9px;">(連)</span>` : '';
 
-                            // 獨立的刪除按鈕
                             let delBtn = document.createElement('button');
                             delBtn.className = 'del-task';
                             delBtn.innerText = '✖';
-                            delBtn.onclick = (e) => {
-                                e.stopPropagation(); // 阻止觸發修改彈窗
-                                deleteTaskById(task.id);
-                            };
+                            delBtn.onclick = (e) => { e.stopPropagation(); deleteTaskById(task.id); };
 
                             tDiv.innerHTML = `${timeHTML}${task.title}${multiSuffix}`;
                             tDiv.prepend(delBtn);
@@ -548,9 +531,8 @@
             });
         }
         
-        /* 彈出視窗：新增模式 */
         function openModal(dateStr) {
-            document.getElementById('editingTaskId').value = ''; // 清空代表新增
+            document.getElementById('editingTaskId').value = ''; 
             document.getElementById('taskStartDate').value = dateStr; 
             document.getElementById('taskEndDate').value = dateStr; 
             document.getElementById('modalDateTitle').innerText = `📅 新增行程排程`;
@@ -561,19 +543,17 @@
             document.getElementById('taskModal').style.display = 'flex';
         }
 
-        /* 彈出視窗：修改模式 */
         function openModifyModal(taskId) {
             let task = calendarTasks.find(t => t.id === taskId);
             if (!task) return;
 
-            document.getElementById('editingTaskId').value = task.id; // 設定正在修改的 ID
+            document.getElementById('editingTaskId').value = task.id; 
             document.getElementById('taskStartDate').value = task.startDate; 
             document.getElementById('taskEndDate').value = task.endDate; 
             document.getElementById('modalDateTitle').innerText = `✏️ 修改行程排程`;
             document.getElementById('taskTitle').value = task.title; 
             document.getElementById('taskTime').value = task.time || '';
             
-            // 反推提醒設定
             if (task.reminderTimestamp) {
                 let rDate = new Date(task.reminderTimestamp);
                 let sDate = new Date(task.startDate + 'T00:00:00');
@@ -584,13 +564,11 @@
                 document.getElementById('taskReminderOffset').value = '0'; 
                 document.getElementById('taskReminderTime').value = '';
             }
-
             document.getElementById('taskModal').style.display = 'flex';
         }
 
         function closeModal() { document.getElementById('taskModal').style.display = 'none'; }
         
-        /* 儲存排程 (整合了新增與修改) */
         function saveTask() {
             let targetId = document.getElementById('editingTaskId').value;
             let startDate = document.getElementById('taskStartDate').value;
@@ -612,7 +590,6 @@
             }
             
             if (targetId) {
-                // 修改現有排程
                 let taskIndex = calendarTasks.findIndex(t => t.id === targetId);
                 if (taskIndex !== -1) {
                     calendarTasks[taskIndex].startDate = startDate;
@@ -620,10 +597,9 @@
                     calendarTasks[taskIndex].title = title;
                     calendarTasks[taskIndex].time = time;
                     calendarTasks[taskIndex].reminderTimestamp = reminderTimestamp;
-                    calendarTasks[taskIndex].isDismissed = false; // 重置通知阻斷
+                    calendarTasks[taskIndex].isDismissed = false; 
                 }
             } else {
-                // 新增排程
                 calendarTasks.push({ 
                     id: 'task-' + Date.now() + Math.random(), 
                     startDate: startDate,
@@ -640,9 +616,8 @@
             renderCalendar();
         }
         
-        /* 依據 ID 進行刪除 */
         function deleteTaskById(taskId) {
-            if(confirm("確定刪除此排程嗎？(這會移除這段連續日期內的所有此標籤)")) {
+            if(confirm("確定刪除此排程嗎？")) {
                 let toastEl = document.getElementById(`toast-${taskId}`); if (toastEl) toastEl.remove();
                 calendarTasks = calendarTasks.filter(t => t.id !== taskId);
                 localStorage.setItem('myCalendarTasks', JSON.stringify(calendarTasks)); 
@@ -712,7 +687,7 @@
                     reader.onloadend = function() { tempAudioBase64 = reader.result; createAudioPlayer(tempAudioBase64); document.getElementById('recordStatus').innerText = "🎙️ 錄音完成！(請記得點選儲存)"; }
                     stream.getTracks().forEach(track => track.stop());
                 };
-            }).catch(err => { alert("無法啟動麥克風，請確認網址是否為 HTTPS 連線或給予麥克風權限！"); });
+            }).catch(err => { alert("無法啟動麥克風，請確認權限！"); });
         }
         function stopRecording() { if(mediaRecorder && mediaRecorder.state === "recording") { mediaRecorder.stop(); document.getElementById('btnStartRecord').style.display = 'block'; document.getElementById('btnStopRecord').style.display = 'none'; } }
 
@@ -729,4 +704,32 @@
         }
 
         function saveMeetingNote() {
-            let title = document.getElementById
+            let title = document.getElementById('nbTitleInput').value || '未命名筆記'; let content = document.getElementById('nbContentInput').value; let dateStr = new Date().toLocaleString('zh-TW');
+            if (currentEditingNoteIndex === -1) { meetingNotes.unshift({ title: title, content: content, date: dateStr, audio: tempAudioBase64 }); } 
+            else { meetingNotes[currentEditingNoteIndex].title = title; meetingNotes[currentEditingNoteIndex].content = content; meetingNotes[currentEditingNoteIndex].date = dateStr; meetingNotes[currentEditingNoteIndex].audio = tempAudioBase64; }
+            localStorage.setItem('myMeetingNotes', JSON.stringify(meetingNotes)); closeNoteEditor(); renderMeetingNotes();
+        }
+        function deleteMeetingNote(index) { if(confirm("確定刪除此會議筆記嗎？")) { meetingNotes.splice(index, 1); localStorage.setItem('myMeetingNotes', JSON.stringify(meetingNotes)); renderMeetingNotes(); } }
+
+        function checkAndTriggerReminders() {
+            let nowTime = new Date().getTime();
+            calendarTasks.forEach((task) => {
+                if (task.reminderTimestamp && !task.isDismissed && nowTime >= task.reminderTimestamp) {
+                    showNotificationToast(task.id, 'cal', `行程預警通知 (主行程日: ${task.startDate})`, task.title);
+                }
+            });
+            notes.forEach((note) => {
+                if (!note.isDone && note.reminderTime && !note.isDismissed && nowTime >= note.reminderTime) {
+                    showNotificationToast(note.id, 'note', `智慧便利貼時效提醒`, note.text);
+                }
+            });
+        }
+
+        window.addEventListener('resize', renderCalendar);
+        setInterval(checkAndTriggerReminders, 10000);
+        
+        // 初始啟動
+        switchCalendarView(calendarViewMode); renderNotes(); checkAndTriggerReminders(); 
+    </script>
+</body>
+</html>
